@@ -12,6 +12,8 @@ export type RuntimeCheck = {
 export function getRuntimeChecks(): RuntimeCheck[] {
   const env = getEnv();
   const isProduction = process.env.NODE_ENV === "production";
+  const aiGatewayEnabled = env.HORIZON_AI_PROVIDER === "gateway";
+  const aiGatewayAuthenticated = Boolean(env.AI_GATEWAY_API_KEY || env.VERCEL_OIDC_TOKEN);
 
   return [
     {
@@ -39,6 +41,17 @@ export function getRuntimeChecks(): RuntimeCheck[] {
       message: isDemoModeAllowed()
         ? "Demo fallback allowed for local work."
         : "Demo fallback disabled.",
+    },
+    {
+      key: "classification",
+      label: "Publication classifier",
+      ok: !aiGatewayEnabled || (aiGatewayAuthenticated && env.HORIZON_AI_MODEL !== "stub-classifier-v0"),
+      severity: aiGatewayEnabled ? "warning" : "info",
+      message: aiGatewayEnabled
+        ? aiGatewayAuthenticated && env.HORIZON_AI_MODEL !== "stub-classifier-v0"
+          ? `AI Gateway configured for public publication text using ${env.HORIZON_AI_MODEL}.`
+          : "AI Gateway selected without complete model and authentication configuration."
+        : "Deterministic publication classification is active.",
     },
   ];
 }

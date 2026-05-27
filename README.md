@@ -2,7 +2,7 @@
 
 MVP foundation for a regulatory horizon-scanning workflow focused on EU crypto, payments, digital assets, and prudential supervision.
 
-The current working slice ingests Tier 1 public regulator sources, normalises publications, stores version history, classifies against the delivered taxonomy, scores publications against local product maps, routes items through human review, prepares approved alert drafts, and keeps delivery behind explicit reviewed sends. Reviewers can correct tags, deadlines, confidence, summaries, and service routing, with correction history and score recalculation. Governed service-package updates invalidate pending alert drafts and flow into newly generated payloads. Client product maps stay local. No legal, client, recruiting, or public communications are sent automatically.
+The current working slice ingests Tier 1 public regulator sources, normalises publications, stores version history, classifies against the delivered taxonomy, scores publications against local product maps, routes items through human review, prepares approved alert drafts, and keeps delivery behind explicit reviewed sends. Classification uses deterministic rules by default and can use structured AI Gateway output for public publication text after explicit configuration. Reviewers can rerun classification, correct tags, deadlines, confidence, summaries, and service routing, with correction history and score recalculation. Governed service-package updates invalidate pending alert drafts and flow into newly generated payloads. Client product maps stay local. No legal, client, recruiting, or public communications are sent automatically.
 
 ## Stack
 
@@ -61,7 +61,7 @@ Review decisions, service catalogue governance, source diligence edits, and manu
 - `prisma.config.ts`: Prisma schema, migration, seed, and datasource configuration.
 - `src/lib/ingestion`: source adapters, diligence-gated polling, RSS parsing, detail extraction, paragraph versioning, and persistence.
 - `src/lib/impact-scoring.ts`: local product-map scoring, no LLM calls.
-- `src/lib/ai/classification.ts`: publication-only classification stub and structured-output schema.
+- `src/lib/ai/classification.ts`: publication-only deterministic classifier and optional AI Gateway structured-output execution.
 - `src/lib/review.ts`: internal review state transitions, validated corrections, correction history, and alert invalidation after revised classifications.
 - `src/lib/alerts.ts` and `src/lib/delivery.ts`: alert draft generation, approval, and reviewed delivery attempts.
 - `src/app`: dashboard, review queue, alert cockpit, service catalogue, source diligence, audit log, diagnostics, publication detail, digest preview, source registry, and API routes.
@@ -83,7 +83,8 @@ Review decisions, service catalogue governance, source diligence edits, and manu
 - Reviewer attribution for persisted decisions and approvals is taken from the authenticated operator identity.
 - Configured Postgres reads fail visibly on error and never substitute sample client records.
 - Secrets stay in environment variables. Postgres stores only non-secret integration metadata.
-- The MVP classification stub only processes public regulator publication text.
+- The classifier sends only public regulator publication text to AI Gateway when `HORIZON_AI_PROVIDER="gateway"`, a model is selected, and gateway authentication is configured.
+- Reviewer-triggered classification reruns return the publication to pending review and retire related pending alert drafts.
 - Product-map impact scoring is deterministic and local in this pass.
 - Live polling honours source reuse status and allowed cadence; sources awaiting diligence remain blocked.
 - Production mode denies an unconfigured authenticated app. Read-only demo rendering is available only when explicitly permitted with `HORIZON_ALLOW_DEMO_MODE="true"` and no database is configured.

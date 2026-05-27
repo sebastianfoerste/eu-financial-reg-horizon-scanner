@@ -57,6 +57,16 @@ export function getRegulationFamilies(taxonomy = loadTaxonomy()) {
   return Object.keys(taxonomy.regulation_family);
 }
 
+export function getRegulationSubTopics(taxonomy = loadTaxonomy()) {
+  return Object.values(taxonomy.regulation_family).flatMap((family) => {
+    if (!family || typeof family !== "object" || !("sub_topics" in family)) return [];
+    const subTopics = family.sub_topics;
+    return Array.isArray(subTopics)
+      ? subTopics.filter((value): value is string => typeof value === "string")
+      : [];
+  });
+}
+
 export function getJurisdictionValues(taxonomy = loadTaxonomy()) {
   const values = new Set<string>(["eu"]);
 
@@ -81,13 +91,22 @@ export function getJurisdictionValues(taxonomy = loadTaxonomy()) {
 }
 
 export function assertTaxonomyValue(
-  axis: "regulation_family" | "activity" | "licence_type" | "publication_type" | "topic" | "jurisdiction",
+  axis:
+    | "regulation_family"
+    | "regulation_sub_topic"
+    | "activity"
+    | "licence_type"
+    | "publication_type"
+    | "topic"
+    | "jurisdiction",
   value: string,
   taxonomy = loadTaxonomy(),
 ) {
   const allowed =
     axis === "publication_type"
       ? getPublicationTypes(taxonomy)
+      : axis === "regulation_sub_topic"
+        ? getRegulationSubTopics(taxonomy)
       : axis === "topic"
         ? getTopicPaths(taxonomy)
         : axis === "regulation_family"

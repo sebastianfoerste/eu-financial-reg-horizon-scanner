@@ -13,6 +13,11 @@ export type PublicationListItem = {
   bodyText: string;
   tags: ClassificationVector;
   confidence: number;
+  classifierModel: string;
+  classifierVersion: string;
+  classifierStatus: "STUB" | "GENERATED" | "FALLBACK";
+  classifierError: string | null;
+  taxonomyVersion: string;
   deadline?: string | null;
   impactBucket: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | "NONE";
   impactScore: number;
@@ -70,6 +75,11 @@ export const mockPublications: PublicationListItem[] = [
       jurisdictions: ["eu", "esma"],
     },
     confidence: 0.82,
+    classifierModel: "deterministic-keyword-rules",
+    classifierVersion: "stub:keyword-rules-v1",
+    classifierStatus: "STUB",
+    classifierError: null,
+    taxonomyVersion: "2026.05.27",
     impactBucket: "HIGH",
     impactScore: 82,
     summary:
@@ -111,6 +121,11 @@ export const mockPublications: PublicationListItem[] = [
       jurisdictions: ["eu", "eba", "joint_committee_esas"],
     },
     confidence: 0.74,
+    classifierModel: "deterministic-keyword-rules",
+    classifierVersion: "stub:keyword-rules-v1",
+    classifierStatus: "STUB",
+    classifierError: null,
+    taxonomyVersion: "2026.05.27",
     impactBucket: "MEDIUM",
     impactScore: 64,
     summary:
@@ -151,6 +166,11 @@ export const mockPublications: PublicationListItem[] = [
       jurisdictions: ["de", "bafin"],
     },
     confidence: 0.68,
+    classifierModel: "deterministic-keyword-rules",
+    classifierVersion: "stub:keyword-rules-v1",
+    classifierStatus: "STUB",
+    classifierError: null,
+    taxonomyVersion: "2026.05.27",
     impactBucket: "LOW",
     impactScore: 38,
     summary:

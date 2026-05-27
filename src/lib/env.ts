@@ -27,7 +27,9 @@ const EnvSchema = z.object({
   HORIZON_BOT_USER_AGENT: z
     .string()
     .default("EUFinancialRegHorizonScanner/0.1 (+https://gunnercooke.com)"),
-  HORIZON_AI_PROVIDER: z.string().default("stub"),
+  AI_GATEWAY_API_KEY: z.string().optional(),
+  VERCEL_OIDC_TOKEN: z.string().optional(),
+  HORIZON_AI_PROVIDER: z.enum(["stub", "gateway"]).default("stub"),
   HORIZON_AI_MODEL: z.string().default("stub-classifier-v0"),
 });
 

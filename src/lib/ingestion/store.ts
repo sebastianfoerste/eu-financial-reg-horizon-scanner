@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 
 import { Prisma } from "@prisma/client";
 
-import { classifyPublicationStub } from "@/lib/ai/classification";
+import { classifyPublication } from "@/lib/ai/classification";
 import { buildTextDiff, summarizeDiff } from "@/lib/diff";
 import { hasDatabaseUrl } from "@/lib/env";
 import { scoreStoredPublicationForAllProductMaps } from "@/lib/impact-recalculation";
@@ -144,6 +144,184 @@ export async function syncSources(adapters: SourceAdapter[]) {
   );
 }
 
+function classificationSnapshot(classification: {
+  regulationFamilies: string[];
+  subTopics: string[];
+  activities: string[];
+  licenceTypes: string[];
+  topicPaths: string[];
+  jurisdictions: string[];
+  summary: string;
+  whatChanged: string | null;
+  whoIsAffected: string | null;
+  deadline: Date | null;
+  recommendedAction: string | null;
+  serviceOfferingIds: string[];
+  classifierModel: string;
+  classifierVersion: string;
+  classifierStatus: string;
+  classifierError: string | null;
+  confidence: number;
+}) {
+  return {
+    regulationFamilies: classification.regulationFamilies,
+    subTopics: classification.subTopics,
+    activities: classification.activities,
+    licenceTypes: classification.licenceTypes,
+    topicPaths: classification.topicPaths,
+    jurisdictions: classification.jurisdictions,
+    summary: classification.summary,
+    whatChanged: classification.whatChanged,
+    whoIsAffected: classification.whoIsAffected,
+    deadline: classification.deadline?.toISOString() ?? null,
+    recommendedAction: classification.recommendedAction,
+    serviceOfferingIds: classification.serviceOfferingIds,
+    classifierModel: classification.classifierModel,
+    classifierVersion: classification.classifierVersion,
+    classifierStatus: classification.classifierStatus,
+    classifierError: classification.classifierError,
+    confidence: classification.confidence,
+  };
+}
+
+async function persistPublicationClassification(input: {
+  publicationId: string;
+  title: string;
+  bodyText: string;
+  sourceCode: string;
+  language: string;
+  publicationType: string;
+  taxonomyVersionId: string;
+}) {
+  const prisma = getPrisma();
+  const classification = await classifyPublication({
+    title: input.title,
+    bodyText: input.bodyText,
+    sourceCode: input.sourceCode,
+    language: input.language,
+    publicationType: input.publicationType,
+  });
+  const serviceOfferingIds = await matchGovernedServiceOfferingIds(classification);
+  const data = {
+    regulationFamilies: classification.regulationFamilies,
+    subTopics: classification.subTopics,
+    activities: classification.activities,
+    licenceTypes: classification.licenceTypes,
+    topicPaths: classification.topicPaths,
+    jurisdictions: classification.jurisdictions,
+    summary: classification.summary,
+    whatChanged: classification.whatChanged,
+    whoIsAffected: classification.whoIsAffected,
+    deadline: classification.deadline ? new Date(classification.deadline) : null,
+    recommendedAction: classification.recommendedAction,
+    serviceOfferingIds,
+    classifierModel: classification.classifierModel,
+    classifierVersion: classification.classifierVersion,
+    classifierStatus: classification.classifierStatus,
+    classifierError: classification.classifierError,
+    confidence: classification.confidence,
+  };
+
+  return prisma.classification.upsert({
+    where: {
+      publicationId_taxonomyVersionId: {
+        publicationId: input.publicationId,
+        taxonomyVersionId: input.taxonomyVersionId,
+      },
+    },
+    update: data,
+    create: {
+      publicationId: input.publicationId,
+      taxonomyVersionId: input.taxonomyVersionId,
+      ...data,
+    },
+  });
+}
+
+export async function reclassifyStoredPublication(input: {
+  publicationReference: string;
+  reviewerName: string;
+  reason: string;
+}) {
+  if (!hasDatabaseUrl()) {
+    return { mode: "demo" as const, classifierStatus: "STUB" as const, invalidatedDrafts: 0 };
+  }
+
+  const prisma = getPrisma();
+  const taxonomyVersion = await syncTaxonomyConfig();
+  if (!taxonomyVersion) throw new Error("A taxonomy version is required for classification.");
+  const publication = await prisma.publication.findFirst({
+    where: { OR: [{ id: input.publicationReference }, { externalId: input.publicationReference }] },
+    include: { source: true },
+  });
+  if (!publication) throw new Error("Publication was not found for classification.");
+  const previous = await prisma.classification.findUnique({
+    where: {
+      publicationId_taxonomyVersionId: {
+        publicationId: publication.id,
+        taxonomyVersionId: taxonomyVersion.id,
+      },
+    },
+  });
+  const classification = await persistPublicationClassification({
+    publicationId: publication.id,
+    title: publication.title,
+    bodyText: publication.bodyText,
+    sourceCode: publication.source.code,
+    language: publication.language,
+    publicationType: publication.publicationType,
+    taxonomyVersionId: taxonomyVersion.id,
+  });
+
+  if (previous) {
+    await prisma.classificationRevision.create({
+      data: {
+        publicationId: publication.id,
+        classificationId: classification.id,
+        beforeJson: classificationSnapshot(previous) as Prisma.InputJsonValue,
+        afterJson: classificationSnapshot(classification) as Prisma.InputJsonValue,
+        reason: input.reason,
+        reviewerName: input.reviewerName,
+      },
+    });
+  }
+
+  await scoreStoredPublicationForAllProductMaps(publication.id);
+  await prisma.reviewQueueItem.upsert({
+    where: { publicationId: publication.id },
+    update: {
+      status: "PENDING",
+      reviewerName: input.reviewerName,
+      decisionReason: input.reason,
+      decidedAt: null,
+    },
+    create: {
+      publicationId: publication.id,
+      status: "PENDING",
+      reviewerName: input.reviewerName,
+      decisionReason: input.reason,
+    },
+  });
+  const invalidated = await prisma.alert.updateMany({
+    where: {
+      publicationId: publication.id,
+      status: { in: ["DRAFT", "APPROVED", "BLOCKED_BY_CONFIG", "FAILED"] },
+    },
+    data: {
+      status: "SKIPPED",
+      errorMessage: "Classification rerun requires a new human review and alert draft.",
+    },
+  });
+
+  return {
+    mode: "database" as const,
+    publicationId: publication.id,
+    classifierStatus: classification.classifierStatus,
+    classifierVersion: classification.classifierVersion,
+    invalidatedDrafts: invalidated.count,
+  };
+}
+
 export async function upsertCanonicalPublication(publication: CanonicalPublication) {
   if (!hasDatabaseUrl()) {
     return { action: "demo", publicationId: publication.externalId };
@@ -175,6 +353,50 @@ export async function upsertCanonicalPublication(publication: CanonicalPublicati
   });
 
   if (existing && decision.action === "skip") {
+    const currentTaxonomyClassification = taxonomyVersion
+      ? await prisma.classification.findUnique({
+          where: {
+            publicationId_taxonomyVersionId: {
+              publicationId: existing.id,
+              taxonomyVersionId: taxonomyVersion.id,
+            },
+          },
+          select: { id: true },
+        })
+      : null;
+    if (taxonomyVersion && !currentTaxonomyClassification) {
+      await persistPublicationClassification({
+        publicationId: existing.id,
+        title: publication.title,
+        bodyText: publication.bodyText,
+        sourceCode: publication.sourceCode,
+        language: publication.language,
+        publicationType: publication.publicationType,
+        taxonomyVersionId: taxonomyVersion.id,
+      });
+      await scoreStoredPublicationForAllProductMaps(existing.id);
+      await Promise.all([
+        prisma.reviewQueueItem.updateMany({
+          where: { publicationId: existing.id },
+          data: {
+            status: "PENDING",
+            decisionReason: "Taxonomy version changed. Human review is required.",
+            decidedAt: null,
+          },
+        }),
+        prisma.alert.updateMany({
+          where: {
+            publicationId: existing.id,
+            status: { in: ["DRAFT", "APPROVED", "BLOCKED_BY_CONFIG", "FAILED"] },
+          },
+          data: {
+            status: "SKIPPED",
+            errorMessage: "Taxonomy version changed. Generate a new reviewed alert draft.",
+          },
+        }),
+      ]);
+      return { action: "reclassified", publicationId: existing.id };
+    }
     return { action: "skipped", publicationId: existing.id };
   }
 
@@ -277,58 +499,14 @@ export async function upsertCanonicalPublication(publication: CanonicalPublicati
   }
 
   if (taxonomyVersion) {
-    const classification = classifyPublicationStub({
+    await persistPublicationClassification({
+      publicationId: saved.id,
       title: publication.title,
       bodyText: publication.bodyText,
       sourceCode: publication.sourceCode,
       language: publication.language,
       publicationType: publication.publicationType,
-    });
-    const serviceOfferingIds = await matchGovernedServiceOfferingIds(classification);
-
-    await prisma.classification.upsert({
-      where: {
-        publicationId_taxonomyVersionId: {
-          publicationId: saved.id,
-          taxonomyVersionId: taxonomyVersion.id,
-        },
-      },
-      update: {
-        regulationFamilies: classification.regulationFamilies,
-        subTopics: classification.subTopics,
-        activities: classification.activities,
-        licenceTypes: classification.licenceTypes,
-        topicPaths: classification.topicPaths,
-        jurisdictions: classification.jurisdictions,
-        summary: classification.summary,
-        whatChanged: classification.whatChanged,
-        whoIsAffected: classification.whoIsAffected,
-        deadline: classification.deadline ? new Date(classification.deadline) : null,
-        recommendedAction: classification.recommendedAction,
-        serviceOfferingIds,
-        classifierModel: classification.classifierModel,
-        classifierVersion: classification.classifierVersion,
-        confidence: classification.confidence,
-      },
-      create: {
-        publicationId: saved.id,
-        taxonomyVersionId: taxonomyVersion.id,
-        regulationFamilies: classification.regulationFamilies,
-        subTopics: classification.subTopics,
-        activities: classification.activities,
-        licenceTypes: classification.licenceTypes,
-        topicPaths: classification.topicPaths,
-        jurisdictions: classification.jurisdictions,
-        summary: classification.summary,
-        whatChanged: classification.whatChanged,
-        whoIsAffected: classification.whoIsAffected,
-        deadline: classification.deadline ? new Date(classification.deadline) : null,
-        recommendedAction: classification.recommendedAction,
-        serviceOfferingIds,
-        classifierModel: classification.classifierModel,
-        classifierVersion: classification.classifierVersion,
-        confidence: classification.confidence,
-      },
+      taxonomyVersionId: taxonomyVersion.id,
     });
 
     await scoreStoredPublicationForAllProductMaps(saved.id);

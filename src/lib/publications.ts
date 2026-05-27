@@ -27,6 +27,7 @@ type DbPublication = Prisma.PublicationGetPayload<{
     classifications: {
       orderBy: { createdAt: "desc" };
       take: 1;
+      include: { taxonomyVersion: true };
     };
     impactScores: {
       orderBy: { scoredAt: "desc" };
@@ -90,6 +91,11 @@ function mapDbPublication(publication: DbPublication): PublicationListItem {
       jurisdictions: classification?.jurisdictions ?? [],
     },
     confidence: classification?.confidence ?? 0,
+    classifierModel: classification?.classifierModel ?? "unclassified",
+    classifierVersion: classification?.classifierVersion ?? "unclassified",
+    classifierStatus: classification?.classifierStatus ?? "STUB",
+    classifierError: classification?.classifierError ?? null,
+    taxonomyVersion: classification?.taxonomyVersion.version ?? "unclassified",
     deadline: classification?.deadline?.toISOString() ?? null,
     impactBucket: impactScore?.bucket ?? "NONE",
     impactScore: impactScore?.score ?? 0,
@@ -122,6 +128,7 @@ export async function listPublications(filters: PublicationFilters = {}, organis
       classifications: {
         orderBy: { createdAt: "desc" },
         take: 1,
+        include: { taxonomyVersion: true },
       },
       impactScores: {
         where: organisationId ? { organisationId } : undefined,
@@ -149,6 +156,7 @@ export async function getPublication(id: string, organisationId?: string) {
       classifications: {
         orderBy: { createdAt: "desc" },
         take: 1,
+        include: { taxonomyVersion: true },
       },
       impactScores: {
         where: organisationId ? { organisationId } : undefined,

@@ -5,7 +5,7 @@
 # licence_type, topic, jurisdiction. Every Classification record stores
 # the version below for reproducibility.
 
-version: "2026.05.20"
+version: "2026.05.27"
 maintainer: "Sebastian Foerste"
 review_cadence: "weekly during build phase, monthly after month 6"
 
@@ -551,7 +551,7 @@ service_offerings:
     name: "MiCAR CASP / ART / EMT authorisation package"
     triggers:
       regulation_family: [micar]
-      topic: [authorisation_and_passporting]
+      topic: [authorisation_and_passporting.initial_authorisation]
     price_indication: "fixed fee from EUR 35.000"
   - id: gc_micar_white_paper
     name: "MiCAR white paper drafting and notification"
@@ -580,7 +580,7 @@ service_offerings:
     name: "PI / EMI authorisation package"
     triggers:
       regulation_family: [psd, emd]
-      topic: [authorisation_and_passporting]
+      topic: [authorisation_and_passporting.initial_authorisation]
     price_indication: "fixed fee from EUR 28.000"
   - id: gc_tokenisation_legal_opinion
     name: "Tokenised RWA legal opinion and structuring"

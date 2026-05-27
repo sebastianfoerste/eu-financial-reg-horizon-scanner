@@ -9,7 +9,6 @@ import { TagList } from "@/components/tag-list";
 import { getActiveOrganisationId } from "@/lib/authz";
 import { getPublication, getPublicationParagraphDiffs, getPublicationVersions } from "@/lib/publications";
 import { getRoutedServiceOfferings } from "@/lib/service-offerings";
-import { loadTaxonomy } from "@/lib/taxonomy";
 import { compactDate } from "@/lib/utils";
 
 type DetailProps = {
@@ -27,7 +26,6 @@ export default async function PublicationDetailPage({ params }: DetailProps) {
 
   if (!publication) notFound();
 
-  const taxonomy = loadTaxonomy();
   const offerings = await getRoutedServiceOfferings(publication.serviceOfferingIds);
   const consultationUrl =
     offerings.find((offering) => offering.calendlyUrl)?.calendlyUrl ?? "https://www.gunnercooke.com";
@@ -150,7 +148,7 @@ export default async function PublicationDetailPage({ params }: DetailProps) {
                 <TaxonomyGroup title="Topic" tags={publication.tags.topicPaths} />
                 <TaxonomyGroup title="Jurisdiction" tags={publication.tags.jurisdictions} />
               </div>
-              <p className="mt-4 font-mono text-xs text-zinc-500">Taxonomy {taxonomy.version}</p>
+              <p className="mt-4 font-mono text-xs text-zinc-500">Taxonomy {publication.taxonomyVersion}</p>
             </div>
 
             <div className="rounded-md border border-zinc-200 bg-white p-5">
@@ -188,6 +186,16 @@ export default async function PublicationDetailPage({ params }: DetailProps) {
                 <div>
                   <dt className="text-zinc-500">Hash</dt>
                   <dd className="break-all font-mono text-xs text-zinc-700">{publication.rawHash}</dd>
+                </div>
+                <div>
+                  <dt className="text-zinc-500">Classification</dt>
+                  <dd className="font-medium text-zinc-950">{publication.classifierStatus}</dd>
+                  <dd className="break-all font-mono text-xs text-zinc-700">
+                    {publication.classifierModel} / {publication.classifierVersion}
+                  </dd>
+                  {publication.classifierError ? (
+                    <dd className="mt-1 text-xs leading-5 text-amber-700">{publication.classifierError}</dd>
+                  ) : null}
                 </div>
               </dl>
             </div>

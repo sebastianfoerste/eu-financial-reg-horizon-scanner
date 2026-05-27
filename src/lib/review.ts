@@ -76,6 +76,8 @@ function serializeClassification(classification: {
   confidence: number;
   classifierModel: string;
   classifierVersion: string;
+  classifierStatus: "STUB" | "GENERATED" | "FALLBACK";
+  classifierError: string | null;
 }) {
   return {
     regulationFamilies: classification.regulationFamilies,
@@ -93,6 +95,8 @@ function serializeClassification(classification: {
     confidence: classification.confidence,
     classifierModel: classification.classifierModel,
     classifierVersion: classification.classifierVersion,
+    classifierStatus: classification.classifierStatus,
+    classifierError: classification.classifierError,
   };
 }
 
@@ -114,6 +118,11 @@ function mapReviewPublication(publication: {
     topicPaths: string[];
     jurisdictions: string[];
     confidence: number;
+    classifierModel: string;
+    classifierVersion: string;
+    classifierStatus: "STUB" | "GENERATED" | "FALLBACK";
+    classifierError: string | null;
+    taxonomyVersion: { version: string };
     summary: string;
     whatChanged: string | null;
     whoIsAffected: string | null;
@@ -153,6 +162,11 @@ function mapReviewPublication(publication: {
       jurisdictions: classification?.jurisdictions ?? [],
     },
     confidence: classification?.confidence ?? 0,
+    classifierModel: classification?.classifierModel ?? "unclassified",
+    classifierVersion: classification?.classifierVersion ?? "unclassified",
+    classifierStatus: classification?.classifierStatus ?? "STUB",
+    classifierError: classification?.classifierError ?? null,
+    taxonomyVersion: classification?.taxonomyVersion.version ?? "unclassified",
     deadline: classification?.deadline?.toISOString() ?? null,
     impactBucket: impact?.bucket ?? "NONE",
     impactScore: impact?.score ?? 0,
@@ -215,7 +229,7 @@ export async function listReviewQueue(organisationId?: string) {
       publication: {
         include: {
           source: true,
-          classifications: { orderBy: { createdAt: "desc" }, take: 1 },
+          classifications: { orderBy: { createdAt: "desc" }, take: 1, include: { taxonomyVersion: true } },
           impactScores: {
             where: organisationId ? { organisationId } : undefined,
             orderBy: { scoredAt: "desc" },
@@ -268,7 +282,7 @@ export async function getReviewItem(publicationId: string, organisationId?: stri
       publication: {
         include: {
           source: true,
-          classifications: { orderBy: { createdAt: "desc" }, take: 1 },
+          classifications: { orderBy: { createdAt: "desc" }, take: 1, include: { taxonomyVersion: true } },
           impactScores: {
             where: organisationId ? { organisationId } : undefined,
             orderBy: { scoredAt: "desc" },

@@ -386,6 +386,8 @@ model Classification {
   serviceOfferingIds String[]
   classifierModel String
   classifierVersion String
+  classifierStatus ClassificationRunStatus @default(STUB)
+  classifierError String?      @db.Text
   confidence     Float
   reviewedByHuman Boolean     @default(false)
   reviewedById   String?
@@ -397,6 +399,12 @@ model Classification {
 
   @@unique([publicationId, taxonomyVersionId])
   @@index([deadline])
+}
+
+enum ClassificationRunStatus {
+  STUB
+  GENERATED
+  FALLBACK
 }
 
 // ---------------------------------------------------------------------------

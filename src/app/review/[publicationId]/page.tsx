@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, RefreshCw, Save } from "lucide-react";
 
-import { decideReviewAction } from "@/app/review/actions";
+import { decideReviewAction, reclassifyPublicationAction } from "@/app/review/actions";
 import { AppShell } from "@/components/app-shell";
 import { ImpactExplanationPanel } from "@/components/impact-explanation-panel";
 import { StatusBadge } from "@/components/status-badge";
@@ -40,6 +40,21 @@ export default async function ReviewDetailPage({ params }: ReviewDetailProps) {
               <p className="mt-2 text-sm text-zinc-600">
                 {publication.sourceName}, {publication.publicationType}, fetched {compactDate(publication.fetchedAt)}
               </p>
+              <p className="mt-2 font-mono text-xs text-zinc-500">
+                Classification {publication.classifierStatus}: {publication.classifierModel} / {publication.classifierVersion}
+                {" "}({publication.taxonomyVersion})
+              </p>
+              {publication.classifierError ? (
+                <p className="mt-2 text-sm leading-6 text-amber-700">{publication.classifierError}</p>
+              ) : null}
+              <form action={reclassifyPublicationAction} className="mt-4">
+                <input type="hidden" name="publicationId" value={publication.id} />
+                <input type="hidden" name="reviewerName" value={item.reviewerName ?? "Sebastian"} />
+                <button className="inline-flex h-9 items-center gap-2 rounded-md border border-zinc-300 bg-white px-3 text-sm font-medium text-zinc-900 hover:bg-zinc-50">
+                  <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                  Reclassify public text
+                </button>
+              </form>
             </div>
             <StatusBadge bucket={publication.impactBucket} score={publication.impactScore} />
           </div>

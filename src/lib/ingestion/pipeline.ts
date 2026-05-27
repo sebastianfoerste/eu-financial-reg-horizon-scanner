@@ -171,7 +171,7 @@ export async function pollSource(adapter: SourceAdapter): Promise<PollSourceResu
       const enrichedPublication = await enrichPublicationDetail(publication);
       const saved = await upsertCanonicalPublication(enrichedPublication);
       if (saved.action === "skipped") skipped += 1;
-      else if (saved.action === "version") updated += 1;
+      else if (saved.action === "version" || saved.action === "reclassified") updated += 1;
       else created += 1;
     }
 

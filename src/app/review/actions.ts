@@ -4,6 +4,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { ReviewStatus } from "@prisma/client";
 
+import { writeAuditLog } from "@/lib/audit";
+import { getReviewerName, requireInternalOperator } from "@/lib/authz";
+import { reclassifyStoredPublication } from "@/lib/ingestion/store";
 import { decideReviewItem } from "@/lib/review";
 
 const statuses = ["PENDING", "IN_REVIEW", "APPROVED", "NEEDS_CHANGES", "FALSE_POSITIVE", "ARCHIVED"] as const;
@@ -61,4 +64,34 @@ export async function decideReviewAction(formData: FormData) {
   revalidatePath(`/review/${publicationId}`);
   revalidatePath(`/publications/${publicationId}`);
   redirect(`/review/${publicationId}?reviewed=1`);
+}
+
+export async function reclassifyPublicationAction(formData: FormData) {
+  const publicationId = readText(formData, "publicationId");
+  const operator = await requireInternalOperator();
+  const reviewerName = getReviewerName(operator, readText(formData, "reviewerName"));
+  const reason = "Publication classification rerun requested by reviewer.";
+  const result = await reclassifyStoredPublication({
+    publicationReference: publicationId,
+    reviewerName,
+    reason,
+  });
+
+  await writeAuditLog({
+    action: "classification.rerun",
+    entityType: "publication",
+    entityId: result.mode === "database" ? result.publicationId : publicationId,
+    actorUserId: operator.userId,
+    organisationId: operator.organisationId,
+    payloadJson: {
+      classifierStatus: result.classifierStatus,
+      invalidatedDrafts: result.invalidatedDrafts,
+    },
+  });
+
+  revalidatePath("/review");
+  revalidatePath(`/review/${publicationId}`);
+  revalidatePath(`/publications/${publicationId}`);
+  revalidatePath("/alerts");
+  redirect(`/review/${publicationId}?classified=1`);
 }
