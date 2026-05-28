@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, RefreshCw, Save } from "lucide-react";
+import { ArrowLeft, CheckCircle2, CircleAlert, RefreshCw, Save, TriangleAlert } from "lucide-react";
 
 import { decideReviewAction, reclassifyPublicationAction } from "@/app/review/actions";
 import { AppShell } from "@/components/app-shell";
@@ -8,7 +8,8 @@ import { ImpactExplanationPanel } from "@/components/impact-explanation-panel";
 import { StatusBadge } from "@/components/status-badge";
 import { requireInternalOperator } from "@/lib/authz";
 import { getReviewItem } from "@/lib/review";
-import { compactDate } from "@/lib/utils";
+import { summarizeReviewReadiness, type ReviewReadinessStatus } from "@/lib/review-readiness";
+import { cn, compactDateTime } from "@/lib/utils";
 
 type ReviewDetailProps = {
   params: Promise<{ publicationId: string }>;
@@ -23,6 +24,7 @@ export default async function ReviewDetailPage({ params }: ReviewDetailProps) {
   const item = await getReviewItem(publicationId, organisationId);
   if (!item) notFound();
   const publication = item.publication;
+  const readiness = summarizeReviewReadiness(item);
 
   return (
     <AppShell active="/review">
@@ -38,7 +40,7 @@ export default async function ReviewDetailPage({ params }: ReviewDetailProps) {
               <p className="text-sm font-semibold uppercase tracking-normal text-teal-700">{item.status}</p>
               <h1 className="mt-2 text-2xl font-semibold tracking-normal text-zinc-950">{publication.title}</h1>
               <p className="mt-2 text-sm text-zinc-600">
-                {publication.sourceName}, {publication.publicationType}, fetched {compactDate(publication.fetchedAt)}
+                {publication.sourceName}, {publication.publicationType}, fetched {compactDateTime(publication.fetchedAt)}
               </p>
               <p className="mt-2 font-mono text-xs text-zinc-500">
                 Classification {publication.classifierStatus}: {publication.classifierModel} / {publication.classifierVersion}
@@ -121,6 +123,34 @@ export default async function ReviewDetailPage({ params }: ReviewDetailProps) {
           </section>
 
           <aside className="min-w-0 space-y-4">
+            <section className="rounded-md border border-zinc-200 bg-white p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-sm font-semibold uppercase tracking-normal text-zinc-500">Review readiness</h2>
+                  <p className="mt-2 text-sm leading-6 text-zinc-600">
+                    {readiness.readyForAlertDraft
+                      ? "Eligible for reviewed alert draft generation."
+                      : `${readiness.blockingCount} blocking item${readiness.blockingCount === 1 ? "" : "s"} before alert drafting.`}
+                  </p>
+                </div>
+                <span
+                  className={cn(
+                    "inline-flex h-8 items-center rounded-md border px-2 text-xs font-semibold",
+                    readiness.readyForAlertDraft
+                      ? "border-teal-200 bg-teal-50 text-teal-800"
+                      : "border-red-200 bg-red-50 text-red-800",
+                  )}
+                >
+                  {readiness.readyForAlertDraft ? "Ready" : "Blocked"}
+                </span>
+              </div>
+              <div className="mt-4 space-y-2">
+                {readiness.checks.map((check) => (
+                  <ReadinessCheckRow key={check.key} status={check.status} label={check.label} detail={check.detail} />
+                ))}
+              </div>
+            </section>
+
             <ImpactExplanationPanel publication={publication} />
 
             <section className="rounded-md border border-zinc-200 bg-white p-5">
@@ -130,7 +160,7 @@ export default async function ReviewDetailPage({ params }: ReviewDetailProps) {
                   item.revisions.map((revision) => (
                     <div key={revision.id} className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
                       <p className="text-sm font-semibold text-zinc-950">{revision.reviewerName}</p>
-                      <p className="mt-1 text-xs text-zinc-500">{compactDate(revision.createdAt)}</p>
+                      <p className="mt-1 text-xs text-zinc-500">{compactDateTime(revision.createdAt)}</p>
                       <p className="mt-2 text-sm leading-6 text-zinc-600">{revision.reason}</p>
                       <details className="mt-2">
                         <summary className="cursor-pointer text-xs font-semibold text-zinc-600">Before and after</summary>
