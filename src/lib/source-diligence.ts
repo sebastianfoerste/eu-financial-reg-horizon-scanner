@@ -151,6 +151,7 @@ function mapDbSource(source: DbSourceWithDiligence): SourceDiligenceView {
 export async function listSourceDiligence(): Promise<SourceDiligenceView[]> {
   if (!hasDatabaseUrl()) {
     assertDemoModeAllowed();
+    const demoFetchedAt = new Date().toISOString();
     return getTierOneAdapters().map((adapter) => {
       const fallback = getDefaultSourceDiligence(adapter.source.code, adapter.source.pollIntervalMin);
       return {
@@ -160,8 +161,8 @@ export async function listSourceDiligence(): Promise<SourceDiligenceView[]> {
         sourceName: adapter.source.displayName,
         baseUrl: adapter.source.baseUrl,
         ...fallback,
-        lastFetchedAt: null,
-        lastRun: null,
+        lastFetchedAt: demoFetchedAt,
+        lastRun: { status: "OK", finishedAt: demoFetchedAt, message: "Demo source freshness marker." },
       };
     });
   }

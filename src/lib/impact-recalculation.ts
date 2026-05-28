@@ -8,6 +8,7 @@ export type ImpactRecalculationResult = {
   productMaps: number;
   publications: number;
   scoresWritten: number;
+  scoresChanged: number;
   mode: "demo" | "database";
 };
 
@@ -15,6 +16,7 @@ function productMapToFootprint(productMap: {
   id: string;
   organisationId: string;
   name: string;
+  topicWatchlist: string[];
   licences: Array<{ licenceType: string; issuingAuthority: string; status: string }>;
   productLines: Array<{ name: string; activities: string[]; isCritical: boolean }>;
   jurisdictions: Array<{
@@ -28,6 +30,7 @@ function productMapToFootprint(productMap: {
     id: productMap.id,
     organisationId: productMap.organisationId,
     name: productMap.name,
+    topicWatchlist: productMap.topicWatchlist,
     licences: productMap.licences.map((licence) => ({
       licenceType: licence.licenceType,
       issuingAuthority: licence.issuingAuthority,
@@ -65,6 +68,46 @@ async function writeImpactScore(input: {
     productMap: input.productMap,
     classification: input.classification,
   });
+  const existing = await prisma.impactScore.findUnique({
+    where: {
+      publicationId_productMapId: {
+        publicationId: input.publicationId,
+        productMapId: input.productMap.id,
+      },
+    },
+    select: {
+      score: true,
+      bucket: true,
+      rationale: true,
+      matchedLicences: true,
+      matchedActivities: true,
+      matchedJurisdictions: true,
+      matchedHomeJurisdictions: true,
+      matchedPassportJurisdictions: true,
+      matchedTopics: true,
+      criticalProductLineMatched: true,
+      rawScore: true,
+      floorAdjustment: true,
+      ruleVersion: true,
+    },
+  });
+  const comparableScore = {
+    score: score.score,
+    bucket: score.bucket,
+    rationale: score.rationale,
+    matchedLicences: score.matchedLicences,
+    matchedActivities: score.matchedActivities,
+    matchedJurisdictions: score.matchedJurisdictions,
+    matchedHomeJurisdictions: score.matchedHomeJurisdictions,
+    matchedPassportJurisdictions: score.matchedPassportJurisdictions,
+    matchedTopics: score.matchedTopics,
+    criticalProductLineMatched: score.criticalProductLineMatched,
+    rawScore: score.rawScore,
+    floorAdjustment: score.floorAdjustment,
+    ruleVersion: score.ruleVersion,
+  };
+  const changed = !existing || JSON.stringify(existing) !== JSON.stringify(comparableScore);
+  const scoredAt = new Date();
 
   await prisma.impactScore.upsert({
     where: {
@@ -81,7 +124,14 @@ async function writeImpactScore(input: {
       matchedLicences: score.matchedLicences,
       matchedActivities: score.matchedActivities,
       matchedJurisdictions: score.matchedJurisdictions,
+      matchedHomeJurisdictions: score.matchedHomeJurisdictions,
+      matchedPassportJurisdictions: score.matchedPassportJurisdictions,
+      matchedTopics: score.matchedTopics,
+      criticalProductLineMatched: score.criticalProductLineMatched,
+      rawScore: score.rawScore,
+      floorAdjustment: score.floorAdjustment,
       ruleVersion: score.ruleVersion,
+      scoredAt,
     },
     create: {
       publicationId: input.publicationId,
@@ -93,15 +143,34 @@ async function writeImpactScore(input: {
       matchedLicences: score.matchedLicences,
       matchedActivities: score.matchedActivities,
       matchedJurisdictions: score.matchedJurisdictions,
+      matchedHomeJurisdictions: score.matchedHomeJurisdictions,
+      matchedPassportJurisdictions: score.matchedPassportJurisdictions,
+      matchedTopics: score.matchedTopics,
+      criticalProductLineMatched: score.criticalProductLineMatched,
+      rawScore: score.rawScore,
+      floorAdjustment: score.floorAdjustment,
       ruleVersion: score.ruleVersion,
+      scoredAt,
     },
   });
 
-  return score;
+  return { score, changed };
+}
+
+async function refreshReviewPriority(publicationId: string) {
+  const prisma = getPrisma();
+  const highestImpact = await prisma.impactScore.aggregate({
+    where: { publicationId },
+    _max: { score: true },
+  });
+  await prisma.reviewQueueItem.updateMany({
+    where: { publicationId },
+    data: { priority: highestImpact._max.score ?? 0 },
+  });
 }
 
 export async function scoreStoredPublicationForAllProductMaps(publicationId: string) {
-  if (!hasDatabaseUrl()) return { productMaps: 0, scoresWritten: 0, mode: "demo" as const };
+  if (!hasDatabaseUrl()) return { productMaps: 0, scoresWritten: 0, scoresChanged: 0, mode: "demo" as const };
 
   const prisma = getPrisma();
   const publication = await prisma.publication.findUnique({
@@ -115,7 +184,7 @@ export async function scoreStoredPublicationForAllProductMaps(publicationId: str
   });
   const classification = publication?.classifications[0];
   if (!publication || !classification) {
-    return { productMaps: 0, scoresWritten: 0, mode: "database" as const };
+    return { productMaps: 0, scoresWritten: 0, scoresChanged: 0, mode: "database" as const };
   }
 
   const productMaps = await prisma.productMap.findMany({
@@ -128,8 +197,9 @@ export async function scoreStoredPublicationForAllProductMaps(publicationId: str
   });
 
   let scoresWritten = 0;
+  let scoresChanged = 0;
   for (const productMap of productMaps) {
-    await writeImpactScore({
+    const result = await writeImpactScore({
       publicationId: publication.id,
       publicationType: publication.publicationType,
       productMap: productMapToFootprint(productMap),
@@ -142,9 +212,11 @@ export async function scoreStoredPublicationForAllProductMaps(publicationId: str
       },
     });
     scoresWritten += 1;
+    if (result.changed) scoresChanged += 1;
   }
+  await refreshReviewPriority(publicationId);
 
-  return { productMaps: productMaps.length, scoresWritten, mode: "database" as const };
+  return { productMaps: productMaps.length, scoresWritten, scoresChanged, mode: "database" as const };
 }
 
 export async function recalculateImpactScores(organisationId?: string): Promise<ImpactRecalculationResult> {
@@ -154,6 +226,7 @@ export async function recalculateImpactScores(organisationId?: string): Promise<
       productMaps: productMaps.length,
       publications: publications.length,
       scoresWritten: productMaps.length * publications.length,
+      scoresChanged: 0,
       mode: "demo",
     };
   }
@@ -178,6 +251,7 @@ export async function recalculateImpactScores(organisationId?: string): Promise<
   });
 
   let scoresWritten = 0;
+  let scoresChanged = 0;
 
   for (const productMap of productMaps) {
     const footprint = productMapToFootprint(productMap);
@@ -186,7 +260,7 @@ export async function recalculateImpactScores(organisationId?: string): Promise<
       const classification = publication.classifications[0];
       if (!classification) continue;
 
-      await writeImpactScore({
+      const result = await writeImpactScore({
         publicationId: publication.id,
         publicationType: publication.publicationType,
         productMap: footprint,
@@ -200,13 +274,18 @@ export async function recalculateImpactScores(organisationId?: string): Promise<
       });
 
       scoresWritten += 1;
+      if (result.changed) scoresChanged += 1;
     }
+  }
+  for (const publication of publications) {
+    await refreshReviewPriority(publication.id);
   }
 
   return {
     productMaps: productMaps.length,
     publications: publications.length,
     scoresWritten,
+    scoresChanged,
     mode: "database",
   };
 }

@@ -137,6 +137,12 @@ function mapReviewPublication(publication: {
     matchedLicences: string[];
     matchedActivities: string[];
     matchedJurisdictions: string[];
+    matchedHomeJurisdictions: string[];
+    matchedPassportJurisdictions: string[];
+    matchedTopics: string[];
+    criticalProductLineMatched: boolean;
+    rawScore: number;
+    floorAdjustment: number;
     ruleVersion: string;
   }>;
 }): PublicationListItem {
@@ -180,7 +186,12 @@ function mapReviewPublication(publication: {
     matchedLicences: impact?.matchedLicences ?? [],
     matchedActivities: impact?.matchedActivities ?? [],
     matchedJurisdictions: impact?.matchedJurisdictions ?? [],
-    matchedTopics: [],
+    matchedHomeJurisdictions: impact?.matchedHomeJurisdictions ?? [],
+    matchedPassportJurisdictions: impact?.matchedPassportJurisdictions ?? [],
+    matchedTopics: impact?.matchedTopics ?? [],
+    criticalProductLineMatched: impact?.criticalProductLineMatched ?? false,
+    rawImpactScore: impact?.rawScore ?? 0,
+    impactFloorAdjustment: impact?.floorAdjustment ?? 0,
     scoringRuleVersion: impact?.ruleVersion ?? "unscored",
   };
 }
@@ -232,7 +243,7 @@ export async function listReviewQueue(organisationId?: string) {
           classifications: { orderBy: { createdAt: "desc" }, take: 1, include: { taxonomyVersion: true } },
           impactScores: {
             where: organisationId ? { organisationId } : undefined,
-            orderBy: { scoredAt: "desc" },
+            orderBy: { score: "desc" },
             take: 1,
           },
         },
@@ -285,7 +296,7 @@ export async function getReviewItem(publicationId: string, organisationId?: stri
           classifications: { orderBy: { createdAt: "desc" }, take: 1, include: { taxonomyVersion: true } },
           impactScores: {
             where: organisationId ? { organisationId } : undefined,
-            orderBy: { scoredAt: "desc" },
+            orderBy: { score: "desc" },
             take: 1,
           },
           classificationRevisions: { orderBy: { createdAt: "desc" } },

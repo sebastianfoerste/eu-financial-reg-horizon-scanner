@@ -2,14 +2,21 @@ import Link from "next/link";
 import { Check, CircleAlert, Send, ShieldCheck } from "lucide-react";
 
 import { approveAlertAction, generateAlertDraftsAction, sendAlertAction } from "@/app/alerts/actions";
+import { ActionNotice } from "@/components/action-notice";
 import { AppShell } from "@/components/app-shell";
+import { ProductMapConfirmationBadge } from "@/components/product-map-confirmation-badge";
 import { StatusBadge } from "@/components/status-badge";
 import { canApproveAlertStatus, listAlerts } from "@/lib/alerts";
 import { getActiveOrganisationId } from "@/lib/authz";
 import { listIntegrationDiagnostics } from "@/lib/delivery";
+import { getProductMapDeliveryReadiness } from "@/lib/product-maps";
 import { compactDate } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
+
+type AlertsPageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
 
 const impactBuckets = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "NONE"] as const;
 
@@ -19,17 +26,37 @@ function readImpactBucket(value: string) {
     : "NONE";
 }
 
-export default async function AlertsPage() {
+function readParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function getAlertNotice(params: Record<string, string | string[] | undefined>) {
+  if (readParam(params.blocked) === "footprint") {
+    return { tone: "warning" as const, message: "Alert delivery is suspended until active product-map facts are confirmed." };
+  }
+  if (readParam(params.delivery) === "blocked") {
+    return { tone: "warning" as const, message: "Reviewed delivery could not proceed. Review integration status and alert errors." };
+  }
+  if (readParam(params.generated) === "1") return { tone: "success" as const, message: "Alert drafts generated for eligible reviewed publications." };
+  if (readParam(params.approved) === "1") return { tone: "success" as const, message: "Alert draft approved. Explicit send remains required." };
+  if (readParam(params.sent) === "1") return { tone: "success" as const, message: "Reviewed alert delivery attempt recorded." };
+  return null;
+}
+
+export default async function AlertsPage({ searchParams }: AlertsPageProps) {
+  const notice = getAlertNotice(await searchParams);
   const organisationId = await getActiveOrganisationId();
-  const [alerts, integrations] = await Promise.all([
+  const [alerts, integrations, footprintReadiness] = await Promise.all([
     listAlerts(organisationId),
     listIntegrationDiagnostics(organisationId),
+    getProductMapDeliveryReadiness(organisationId),
   ]);
   const openDrafts = alerts.filter((alert) => alert.status === "DRAFT").length;
 
   return (
     <AppShell active="/alerts">
       <div className="space-y-6">
+        {notice ? <ActionNotice tone={notice.tone}>{notice.message}</ActionNotice> : null}
         <section className="flex flex-col justify-between gap-4 border-b border-zinc-200 pb-6 md:flex-row md:items-end">
           <div>
             <p className="text-sm font-semibold uppercase tracking-normal text-teal-700">Approved delivery</p>
@@ -38,15 +65,42 @@ export default async function AlertsPage() {
             </h1>
           </div>
           <form action={generateAlertDraftsAction}>
-            <button className="inline-flex h-10 items-center gap-2 rounded-md bg-zinc-950 px-4 text-sm font-semibold text-white hover:bg-zinc-800">
+            <button
+              disabled={!footprintReadiness.ready}
+              className="inline-flex h-10 items-center gap-2 rounded-md bg-zinc-950 px-4 text-sm font-semibold text-white enabled:hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
               <CircleAlert className="h-4 w-4" aria-hidden="true" />
               Generate drafts
             </button>
           </form>
         </section>
 
-        <section className="grid gap-3 md:grid-cols-4">
+        {!footprintReadiness.ready ? (
+          <section className="rounded-md border border-amber-200 bg-amber-50 p-4">
+            <p className="text-sm font-semibold text-amber-950">{footprintReadiness.message}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {footprintReadiness.blockingMaps.map(({ productMap, assessment }) => (
+                <Link
+                  key={productMap.id}
+                  href={`/product-maps/${productMap.id}`}
+                  className="inline-flex items-center gap-2 rounded-md border border-amber-200 bg-white px-3 py-2 text-sm font-medium text-zinc-900 hover:border-amber-300"
+                >
+                  {productMap.name}
+                  <ProductMapConfirmationBadge assessment={assessment} />
+                </Link>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        <section className="grid gap-3 md:grid-cols-5">
           <Metric label="Drafts" value={openDrafts.toString()} />
+          <div className="rounded-md border border-zinc-200 bg-white p-3">
+            <p className="text-sm font-semibold text-zinc-950">Footprints</p>
+            <p className={footprintReadiness.ready ? "mt-1 text-xs text-teal-700" : "mt-1 text-xs text-amber-700"}>
+              {footprintReadiness.ready ? "Confirmed" : "Action needed"}
+            </p>
+          </div>
           {integrations.slice(0, 3).map((integration) => (
             <div key={integration.provider} className="rounded-md border border-zinc-200 bg-white p-3">
               <p className="text-sm font-semibold text-zinc-950">{integration.label}</p>
@@ -97,8 +151,10 @@ export default async function AlertsPage() {
                   <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
                     <p className="text-xs font-semibold uppercase tracking-normal text-zinc-500">Impact explanation</p>
                     <p className="mt-2 text-sm text-zinc-700">
-                      Bucket {alert.payload.impactBucket}, raw score {alert.payload.impactScore}. Services:
-                      {" "}
+                      Bucket {alert.payload.impactBucket}. Weighted subtotal{" "}
+                      {alert.payload.rawImpactScore ?? alert.payload.impactScore}. Floor uplift{" "}
+                      {alert.payload.floorAdjustment ?? 0}. Final score {alert.payload.impactScore}. Rule{" "}
+                      {alert.payload.scoringRuleVersion ?? "unscored"}. Services:{" "}
                       {alert.payload.serviceOfferingIds.join(", ") || "none"}
                     </p>
                   </div>
@@ -106,25 +162,27 @@ export default async function AlertsPage() {
                     <input type="hidden" name="alertId" value={alert.id} />
                     <input type="hidden" name="reviewerName" value="Sebastian" />
                     <button
-                      disabled={!canApproveAlertStatus(alert.status)}
+                      disabled={!canApproveAlertStatus(alert.status) || !footprintReadiness.ready}
                       className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-md border border-zinc-300 bg-white px-3 text-sm font-medium text-zinc-900 enabled:hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <Check className="h-4 w-4" aria-hidden="true" />
-                      {alert.status === "DRAFT"
-                        ? "Approve"
-                        : canApproveAlertStatus(alert.status)
-                          ? "Reapprove"
-                          : "Approval closed"}
+                      {!footprintReadiness.ready
+                        ? "Confirmation required"
+                        : alert.status === "DRAFT"
+                          ? "Approve"
+                          : canApproveAlertStatus(alert.status)
+                            ? "Reapprove"
+                            : "Approval closed"}
                     </button>
                   </form>
                   <form action={sendAlertAction}>
                     <input type="hidden" name="alertId" value={alert.id} />
                     <button
-                      disabled={alert.status !== "APPROVED"}
+                      disabled={alert.status !== "APPROVED" || !footprintReadiness.ready}
                       className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-md bg-zinc-950 px-3 text-sm font-semibold text-white enabled:hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <Send className="h-4 w-4" aria-hidden="true" />
-                      Send reviewed alert
+                      {footprintReadiness.ready ? "Send reviewed alert" : "Confirmation required"}
                     </button>
                   </form>
                 </div>

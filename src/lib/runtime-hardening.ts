@@ -31,7 +31,7 @@ export function getRuntimeChecks(): RuntimeCheck[] {
       message:
         env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && env.CLERK_SECRET_KEY
           ? "Clerk configured."
-          : "Auth is in demo mode.",
+          : "Auth is running in local operator mode.",
     },
     {
       key: "demo",

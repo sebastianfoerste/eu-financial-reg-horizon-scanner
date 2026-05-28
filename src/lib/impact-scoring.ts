@@ -8,22 +8,27 @@ export type ProductMapFootprint = {
   organisationId: string;
   name: string;
   licences: Array<{
+    id?: string;
     licenceType: string;
     issuingAuthority: string;
+    licenceReference?: string | null;
     status: string;
   }>;
   productLines: Array<{
+    id?: string;
     name: string;
     activities: string[];
+    customerSegment?: string[];
     isCritical: boolean;
   }>;
   jurisdictions: Array<{
+    id?: string;
     jurisdictionCode: string;
     authority?: string | null;
     isHomeMember: boolean;
     isPassportedInto: boolean;
   }>;
-  topicWatchlist?: string[];
+  topicWatchlist: string[];
 };
 
 export type ImpactScoringInput = {
@@ -39,7 +44,12 @@ export type ImpactScoringResult = {
   matchedLicences: string[];
   matchedActivities: string[];
   matchedJurisdictions: string[];
+  matchedHomeJurisdictions: string[];
+  matchedPassportJurisdictions: string[];
   matchedTopics: string[];
+  criticalProductLineMatched: boolean;
+  rawScore: number;
+  floorAdjustment: number;
   ruleVersion: string;
 };
 
@@ -75,32 +85,27 @@ export function scorePublicationForProductMap(input: ImpactScoringInput): Impact
   const criticalActivities = input.productMap.productLines
     .filter((line) => line.isCritical)
     .flatMap((line) => line.activities);
-  const watchlist = input.productMap.topicWatchlist?.length
-    ? input.productMap.topicWatchlist
-    : rules.topic_watchlist;
-
   const matchedLicences = intersect(input.classification.licenceTypes, productLicenceTypes);
   const matchedActivities = intersect(input.classification.activities, productActivities);
   const matchedHomeJurisdictions = intersect(input.classification.jurisdictions, homeJurisdictions);
   const matchedPassportJurisdictions = intersect(input.classification.jurisdictions, passportJurisdictions);
-  const matchedJurisdictions = [...matchedHomeJurisdictions, ...matchedPassportJurisdictions];
-  const matchedTopics = intersect(input.classification.topicPaths, watchlist);
+  const matchedJurisdictions = [...new Set([...matchedHomeJurisdictions, ...matchedPassportJurisdictions])];
+  const matchedTopics = intersect(input.classification.topicPaths, input.productMap.topicWatchlist);
   const matchedCriticalActivities = intersect(input.classification.activities, criticalActivities);
 
-  let score = 0;
-  if (matchedLicences.length) score += rules.weights.licence_match;
-  if (matchedActivities.length) score += rules.weights.activity_overlap;
-  if (matchedHomeJurisdictions.length) score += rules.weights.jurisdiction_home_match;
-  if (matchedPassportJurisdictions.length) score += rules.weights.jurisdiction_passported_match;
-  if (matchedTopics.length) score += rules.weights.topic_watchlist_match;
-  if (matchedCriticalActivities.length) score += rules.weights.critical_product_line_bonus;
+  let rawScore = 0;
+  if (matchedLicences.length) rawScore += rules.weights.licence_match;
+  if (matchedActivities.length) rawScore += rules.weights.activity_overlap;
+  if (matchedHomeJurisdictions.length) rawScore += rules.weights.jurisdiction_home_match;
+  if (matchedPassportJurisdictions.length) rawScore += rules.weights.jurisdiction_passported_match;
+  if (matchedTopics.length) rawScore += rules.weights.topic_watchlist_match;
+  if (matchedCriticalActivities.length) rawScore += rules.weights.critical_product_line_bonus;
 
   const floor = rules.publication_type_floor[input.publicationType] ?? 0;
-  if ((matchedLicences.length || matchedActivities.length) && score < floor) {
-    score = floor;
-  }
+  const floorAdjustment =
+    (matchedLicences.length || matchedActivities.length) && rawScore < floor ? floor - rawScore : 0;
 
-  const clamped = clampScore(score);
+  const clamped = clampScore(rawScore + floorAdjustment);
   const reasons = [
     matchedLicences.length ? `licence match: ${matchedLicences.join(", ")}` : null,
     matchedActivities.length ? `activity overlap: ${matchedActivities.join(", ")}` : null,
@@ -118,7 +123,12 @@ export function scorePublicationForProductMap(input: ImpactScoringInput): Impact
     matchedLicences,
     matchedActivities,
     matchedJurisdictions,
+    matchedHomeJurisdictions,
+    matchedPassportJurisdictions,
     matchedTopics,
+    criticalProductLineMatched: matchedCriticalActivities.length > 0,
+    rawScore,
+    floorAdjustment,
     ruleVersion: rules.version,
   };
 }

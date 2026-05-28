@@ -41,6 +41,42 @@ describe("impact scoring", () => {
     expect(result.bucket).toBe("NONE");
   });
 
+  it("awards watchlist points only for topics configured on that local product map", () => {
+    const result = scorePublicationForProductMap({
+      publicationType: "press_release",
+      productMap: { ...demoProductMap, topicWatchlist: [], licences: [], productLines: [], jurisdictions: [] },
+      classification: {
+        regulationFamilies: ["dora"],
+        licenceTypes: [],
+        activities: [],
+        topicPaths: ["ict_and_resilience.third_party_arrangements"],
+        jurisdictions: [],
+      },
+    });
+
+    expect(result.matchedTopics).toEqual([]);
+    expect(result.rawScore).toBe(0);
+    expect(result.score).toBe(0);
+  });
+
+  it("records a publication floor as an uplift rather than an extra scoring component", () => {
+    const result = scorePublicationForProductMap({
+      publicationType: "q_and_a_published",
+      productMap: { ...demoProductMap, topicWatchlist: [], productLines: [], jurisdictions: [] },
+      classification: {
+        regulationFamilies: ["micar"],
+        licenceTypes: ["casp_micar"],
+        activities: [],
+        topicPaths: [],
+        jurisdictions: [],
+      },
+    });
+
+    expect(result.rawScore).toBe(45);
+    expect(result.floorAdjustment).toBe(10);
+    expect(result.score).toBe(55);
+  });
+
   it("loads the versioned rule artifact", () => {
     expect(loadScoringRules().version).toBe("2026.05.20-mvp");
   });

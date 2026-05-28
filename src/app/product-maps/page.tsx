@@ -1,10 +1,12 @@
 import Link from "next/link";
 import type { ComponentType } from "react";
-import { ArrowRight, Building2, GitBranch, MapPinned, ShieldCheck } from "lucide-react";
+import { ArrowRight, Building2, GitBranch, MapPinned, ShieldCheck, Target } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
 import { createProductMapAction } from "@/app/product-maps/actions";
+import { ProductMapConfirmationBadge } from "@/components/product-map-confirmation-badge";
 import { getActiveOrganisationId } from "@/lib/authz";
+import { assessProductMapConfirmation } from "@/lib/product-map-assurance";
 import { listProductMaps } from "@/lib/product-maps";
 import { loadTaxonomy, getJurisdictionValues } from "@/lib/taxonomy";
 import { compactDate } from "@/lib/utils";
@@ -36,6 +38,9 @@ export default async function ProductMapsPage() {
                   <div>
                     <p className="text-sm font-semibold text-zinc-950">{productMap.name}</p>
                     <p className="mt-1 text-sm text-zinc-600">{productMap.organisationName}</p>
+                    <div className="mt-3">
+                      <ProductMapConfirmationBadge assessment={assessProductMapConfirmation(productMap)} />
+                    </div>
                   </div>
                   <Link
                     href={`/product-maps/${productMap.id}`}
@@ -45,20 +50,28 @@ export default async function ProductMapsPage() {
                     <ArrowRight className="h-4 w-4" aria-hidden="true" />
                   </Link>
                 </div>
-                <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                <div className="mt-4 grid gap-2 sm:grid-cols-4">
                   <Metric icon={ShieldCheck} label="Licences" value={productMap.licences.length.toString()} />
                   <Metric icon={GitBranch} label="Product lines" value={productMap.productLines.length.toString()} />
                   <Metric icon={MapPinned} label="Jurisdictions" value={productMap.jurisdictions.length.toString()} />
+                  <Metric icon={Target} label="Watch topics" value={productMap.topicWatchlist.length.toString()} />
                 </div>
-                <p className="mt-3 text-xs text-zinc-500">Updated {compactDate(productMap.updatedAt)}</p>
+                <p className="mt-3 text-xs text-zinc-500">
+                  Updated {compactDate(productMap.updatedAt)}. Confirmation due {compactDate(productMap.nextConfirmationDueAt)}.
+                </p>
               </article>
             ))}
+            {productMaps.length === 0 ? (
+              <div className="rounded-md border border-zinc-200 bg-white p-6 text-sm text-zinc-600">
+                No active product maps are configured for this organisation.
+              </div>
+            ) : null}
           </div>
         </section>
 
         <aside className="rounded-md border border-zinc-200 bg-white p-5">
           <div className="mb-5">
-            <p className="text-sm font-semibold uppercase tracking-normal text-teal-700">MVP intake</p>
+            <p className="text-sm font-semibold uppercase tracking-normal text-teal-700">Onboarding intake</p>
             <h2 className="mt-2 text-xl font-semibold tracking-normal text-zinc-950">Create a product map</h2>
           </div>
           <form action={createProductMapAction} className="space-y-4">
@@ -92,7 +105,6 @@ export default async function ProductMapsPage() {
               <input name="isCritical" type="checkbox" defaultChecked className="h-4 w-4 rounded border-zinc-300" />
               Critical product line
             </label>
-
             <button className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-zinc-950 px-4 text-sm font-semibold text-white hover:bg-zinc-800">
               <Building2 className="h-4 w-4" aria-hidden="true" />
               Save product map

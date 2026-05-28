@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Bell, BookOpenCheck, ClipboardCheck, Database, FileText, Map, PlugZap, Radar, ScrollText } from "lucide-react";
 
 import { AuthControls } from "@/components/auth-controls";
+import { getShellRuntimeStatus } from "@/lib/runtime-shell";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -34,7 +35,7 @@ export function AppShell({ children, active = "/" }: { children: React.ReactNode
           </Link>
 
           <div className="ml-3 shrink-0">
-            <AuthControls />
+            <AuthControls runtime={getShellRuntimeStatus()} />
           </div>
         </div>
         <nav

@@ -10,10 +10,12 @@ export function ImpactExplanationPanel({ publication }: { publication: Publicati
     matchedLicences: publication.matchedLicences,
     matchedActivities: publication.matchedActivities,
     matchedJurisdictions: publication.matchedJurisdictions,
+    matchedHomeJurisdictions: publication.matchedHomeJurisdictions,
+    matchedPassportJurisdictions: publication.matchedPassportJurisdictions,
     matchedTopics: publication.matchedTopics,
+    criticalProductLineMatched: publication.criticalProductLineMatched,
+    floorAdjustment: publication.impactFloorAdjustment,
   });
-
-  const rawScore = explanation.items.reduce((sum, item) => sum + item.points, 0);
 
   return (
     <section className="rounded-md border border-zinc-200 bg-white p-5">
@@ -24,7 +26,7 @@ export function ImpactExplanationPanel({ publication }: { publication: Publicati
         </div>
         <div className="shrink-0 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-right">
           <p className="text-xs text-zinc-500">Raw</p>
-          <p className="text-lg font-semibold text-zinc-950">{rawScore}</p>
+          <p className="text-lg font-semibold text-zinc-950">{publication.rawImpactScore}</p>
         </div>
       </div>
       <div className="mt-4 grid gap-2">

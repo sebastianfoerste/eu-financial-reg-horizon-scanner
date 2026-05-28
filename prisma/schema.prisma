@@ -153,6 +153,11 @@ model ProductMap {
   organisationId String
   name           String
   isActive       Boolean      @default(true)
+  topicWatchlist String[]     @default([])
+  confirmationRequired Boolean @default(true)
+  lastConfirmedAt DateTime?
+  nextConfirmationDueAt DateTime?
+  confirmedByName String?
   notes          String?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
@@ -513,6 +518,12 @@ model ImpactScore {
   matchedLicences String[]
   matchedActivities String[]
   matchedJurisdictions String[]
+  matchedHomeJurisdictions String[] @default([])
+  matchedPassportJurisdictions String[] @default([])
+  matchedTopics  String[]     @default([])
+  criticalProductLineMatched Boolean @default(false)
+  rawScore       Float        @default(0)
+  floorAdjustment Float       @default(0)
   ruleVersion    String
   scoredAt       DateTime     @default(now())
 

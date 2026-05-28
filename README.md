@@ -2,7 +2,7 @@
 
 MVP foundation for a regulatory horizon-scanning workflow focused on EU crypto, payments, digital assets, and prudential supervision.
 
-The current working slice ingests Tier 1 public regulator sources, normalises publications, stores version history, classifies against the delivered taxonomy, scores publications against local product maps, routes items through human review, prepares approved alert drafts, and keeps delivery behind explicit reviewed sends. Classification uses deterministic rules by default and can use structured AI Gateway output for public publication text after explicit configuration. Reviewers can rerun classification, correct tags, deadlines, confidence, summaries, and service routing, with correction history and score recalculation. Governed service-package updates invalidate pending alert drafts and flow into newly generated payloads. Client product maps stay local. No legal, client, recruiting, or public communications are sent automatically.
+The current working slice ingests Tier 1 public regulator sources, normalises publications, stores version history, classifies against the delivered taxonomy, scores publications against local product maps, routes items through human review, prepares approved alert drafts, and keeps delivery behind explicit reviewed sends. Classification uses deterministic rules by default and can use structured AI Gateway output for public publication text after explicit configuration. Product maps maintain local concern watchlists, multiple licences, product lines, jurisdictions, quarterly footprint confirmation, and auditable score recalculation. Stored score explanations retain topic, home-state, passporting, critical-line and score-floor components. Score-affecting footprint edits retire pending alert drafts until the edited footprint is confirmed again. Reviewers can rerun classification, correct tags, deadlines, confidence, summaries, and service routing, with correction history and score recalculation. Governed service-package updates invalidate pending alert drafts and flow into newly generated payloads. Client product maps stay local. No legal, client, recruiting, or public communications are sent automatically.
 
 ## Stack
 
@@ -86,6 +86,8 @@ Review decisions, service catalogue governance, source diligence edits, and manu
 - The classifier sends only public regulator publication text to AI Gateway when `HORIZON_AI_PROVIDER="gateway"`, a model is selected, and gateway authentication is configured.
 - Reviewer-triggered classification reruns return the publication to pending review and retire related pending alert drafts.
 - Product-map impact scoring is deterministic and local in this pass.
+- Product-map edits are organisation-scoped, audit logged, and immediately recalculate the persisted explanation breakdown.
+- Alert generation and reviewed send require current quarterly confirmation for every active product map in the organisation.
 - Live polling honours source reuse status and allowed cadence; sources awaiting diligence remain blocked.
 - Production mode denies an unconfigured authenticated app. Read-only demo rendering is available only when explicitly permitted with `HORIZON_ALLOW_DEMO_MODE="true"` and no database is configured.
 - External publishing, outreach, billing, Neo4j, and fine-tuning remain out of scope for this pilot-ready core.

@@ -6,6 +6,7 @@ import { deliverApprovedAlert, getDeliveryGovernanceBlock, providerForChannel } 
 import { assertDemoModeAllowed, hasDatabaseUrl } from "@/lib/env";
 import { mockPublications } from "@/lib/mock-data";
 import { getPrisma } from "@/lib/prisma";
+import { getProductMapDeliveryReadiness } from "@/lib/product-maps";
 import { getRoutedServiceOfferings } from "@/lib/service-offerings";
 
 const reviewedDeliveryChannels: AlertChannel[] = ["EMAIL_REALTIME", "SLACK", "MS_TEAMS", "HUBSPOT"];
@@ -20,6 +21,9 @@ type AlertPayload = {
   publicationUrl: string;
   impactBucket: string;
   impactScore: number;
+  rawImpactScore?: number;
+  floorAdjustment?: number;
+  scoringRuleVersion?: string;
   serviceOfferingIds: string[];
   serviceOfferings?: Array<{
     id: string;
@@ -89,6 +93,9 @@ function buildPayload(input: {
       score: number;
       bucket: string;
       rationale: string;
+      rawScore: number;
+      floorAdjustment: number;
+      ruleVersion: string;
     }>;
   };
   serviceOfferings: Array<{
@@ -107,6 +114,9 @@ function buildPayload(input: {
     classification?.summary ?? "Classification summary is pending.",
     "",
     `Impact: ${impact?.bucket ?? "NONE"} (${impact?.score ?? 0}/100)`,
+    impact
+      ? `Scoring: weighted subtotal ${impact.rawScore}; floor uplift ${impact.floorAdjustment}; rule ${impact.ruleVersion}`
+      : null,
     impact?.rationale ? `Explanation: ${impact.rationale}` : null,
     classification?.whoIsAffected ? `Affected: ${classification.whoIsAffected}` : null,
     classification?.recommendedAction ? `Action: ${classification.recommendedAction}` : null,
@@ -126,6 +136,9 @@ function buildPayload(input: {
     publicationUrl: `/publications/${input.publication.id}`,
     impactBucket: impact?.bucket ?? "NONE",
     impactScore: impact?.score ?? 0,
+    rawImpactScore: impact?.rawScore ?? 0,
+    floorAdjustment: impact?.floorAdjustment ?? 0,
+    scoringRuleVersion: impact?.ruleVersion ?? "unscored",
     serviceOfferingIds: classification?.serviceOfferingIds ?? [],
     serviceOfferings: input.serviceOfferings.map((offering) => ({
       id: offering.id,
@@ -161,6 +174,9 @@ export async function listAlerts(organisationId?: string): Promise<AlertView[]> 
         publicationUrl: `/publications/${publication.id}`,
         impactBucket: publication.impactBucket,
         impactScore: publication.impactScore,
+        rawImpactScore: publication.rawImpactScore,
+        floorAdjustment: publication.impactFloorAdjustment,
+        scoringRuleVersion: publication.scoringRuleVersion,
         serviceOfferingIds: publication.serviceOfferingIds,
         to: null,
       },
@@ -242,6 +258,18 @@ export async function generateAlertDrafts(input: {
       ? await prisma.organisation.findUnique({ where: { id: organisationId } })
       : await prisma.organisation.findFirst({ orderBy: { createdAt: "asc" } })) ??
     (await prisma.organisation.create({ data: { name: "Pilot organisation", tier: "TRIAL" } }));
+  const readiness = await getProductMapDeliveryReadiness(organisation.id);
+  if (!readiness.ready) {
+    await writeAuditLog({
+      action: "alert.generate.blocked",
+      entityType: "organisation",
+      entityId: organisation.id,
+      organisationId: organisation.id,
+      actorUserId: operator.userId,
+      payloadJson: { reason: readiness.message, blockingProductMaps: readiness.blockingMaps.length },
+    });
+    return { created: 0, skipped: 0, mode: "database" as const, blockedReason: readiness.message };
+  }
   const channels = input.channels?.length ? input.channels : reviewedDeliveryChannels;
   const unsupportedChannel = channels.find((channel) => !reviewedDeliveryChannels.includes(channel));
   if (unsupportedChannel) {
@@ -262,7 +290,7 @@ export async function generateAlertDrafts(input: {
       classifications: { orderBy: { createdAt: "desc" }, take: 1 },
       impactScores: {
         where: { organisationId: organisation.id },
-        orderBy: { scoredAt: "desc" },
+        orderBy: { score: "desc" },
         take: 1,
       },
     },
@@ -350,6 +378,18 @@ export async function approveAlert(input: { alertId: string; reviewerName: strin
   if (!canApproveAlertStatus(currentAlert.status)) {
     throw new Error("Only draft or failed alert attempts can be approved.");
   }
+  const readiness = await getProductMapDeliveryReadiness(currentAlert.organisationId);
+  if (!readiness.ready) {
+    await writeAuditLog({
+      action: "alert.approve.blocked",
+      entityType: "alert",
+      entityId: currentAlert.id,
+      organisationId: currentAlert.organisationId,
+      actorUserId: operator.userId,
+      payloadJson: { reason: readiness.message },
+    });
+    return { ok: false, mode: "database" as const, blockedReason: readiness.message };
+  }
   const alert = await prisma.alert.update({
     where: { id: currentAlert.id },
     data: {
@@ -393,6 +433,23 @@ export async function sendApprovedAlert(input: { alertId: string }) {
   assertOrganisationAccess(operator, alert.organisationId);
   if (alert.status !== "APPROVED") {
     throw new Error("Only approved alert drafts can be sent.");
+  }
+  const readiness = await getProductMapDeliveryReadiness(alert.organisationId);
+  if (!readiness.ready) {
+    const errorMessage = "Product-map confirmation is due. Confirm the footprint and generate a new reviewed alert draft.";
+    await prisma.alert.update({
+      where: { id: alert.id },
+      data: { status: "SKIPPED", errorMessage },
+    });
+    await writeAuditLog({
+      action: "alert.send.blocked",
+      entityType: "alert",
+      entityId: alert.id,
+      organisationId: alert.organisationId,
+      actorUserId: operator.userId,
+      payloadJson: { reason: readiness.message },
+    });
+    return { ok: false, mode: "database" as const, status: "SKIPPED" as const };
   }
 
   const sendClaim = await prisma.alert.updateMany({

@@ -16,8 +16,11 @@ describe("score explanation", () => {
       matchedLicences: ["casp_micar"],
       matchedActivities: ["custody_safekeeping_crypto"],
       matchedJurisdictions: ["eu"],
+      matchedHomeJurisdictions: ["eu"],
+      matchedPassportJurisdictions: [],
       matchedTopics: ["digital_assets_specific.white_paper_review"],
       criticalProductLineMatched: true,
+      floorAdjustment: 0,
     });
 
     expect(explanation.items.map((item) => item.label)).toEqual([
@@ -29,5 +32,27 @@ describe("score explanation", () => {
       "Publication-type floor",
     ]);
     expect(explanation.items.every((item) => typeof item.points === "number")).toBe(true);
+    expect(explanation.items.at(-1)?.points).toBe(0);
+  });
+
+  it("shows the stored passport weight without inventing a floor uplift", () => {
+    const explanation = buildScoreExplanation({
+      publicationType: "q_and_a_published",
+      classification: {
+        regulationFamilies: ["micar"],
+        activities: [],
+        licenceTypes: ["casp_micar"],
+        topicPaths: [],
+        jurisdictions: ["eu"],
+      },
+      matchedLicences: ["casp_micar"],
+      matchedJurisdictions: ["eu"],
+      matchedHomeJurisdictions: [],
+      matchedPassportJurisdictions: ["eu"],
+      floorAdjustment: 0,
+    });
+
+    expect(explanation.items.find((item) => item.label === "Jurisdiction match")?.points).toBe(10);
+    expect(explanation.items.find((item) => item.label === "Publication-type floor")?.points).toBe(0);
   });
 });

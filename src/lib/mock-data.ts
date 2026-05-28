@@ -31,7 +31,12 @@ export type PublicationListItem = {
   matchedLicences: string[];
   matchedActivities: string[];
   matchedJurisdictions: string[];
+  matchedHomeJurisdictions: string[];
+  matchedPassportJurisdictions: string[];
   matchedTopics: string[];
+  criticalProductLineMatched: boolean;
+  rawImpactScore: number;
+  impactFloorAdjustment: number;
   scoringRuleVersion: string;
 };
 
@@ -97,7 +102,12 @@ export const mockPublications: PublicationListItem[] = [
     matchedLicences: ["casp_micar", "art_issuer_micar", "emt_issuer_micar"],
     matchedActivities: ["issuance_of_other_crypto_assets", "issuance_of_art", "issuance_of_emt"],
     matchedJurisdictions: ["eu", "esma"],
+    matchedHomeJurisdictions: [],
+    matchedPassportJurisdictions: ["eu", "esma"],
     matchedTopics: ["digital_assets_specific.white_paper_review"],
+    criticalProductLineMatched: false,
+    rawImpactScore: 82,
+    impactFloorAdjustment: 0,
     scoringRuleVersion: "mvp-seed-v0",
   },
   {
@@ -143,7 +153,12 @@ export const mockPublications: PublicationListItem[] = [
     matchedLicences: ["casp_micar", "payment_institution_psd", "emi_emd"],
     matchedActivities: ["custody_safekeeping_crypto", "payment_initiation"],
     matchedJurisdictions: ["eu", "eba", "joint_committee_esas"],
+    matchedHomeJurisdictions: [],
+    matchedPassportJurisdictions: ["eu"],
     matchedTopics: ["ict_and_resilience.third_party_arrangements"],
+    criticalProductLineMatched: true,
+    rawImpactScore: 64,
+    impactFloorAdjustment: 0,
     scoringRuleVersion: "mvp-seed-v0",
   },
   {
@@ -184,7 +199,12 @@ export const mockPublications: PublicationListItem[] = [
     matchedLicences: ["casp_micar", "emi_emd", "payment_institution_psd"],
     matchedActivities: ["exchange_crypto_for_fiat", "issuance_of_e_money"],
     matchedJurisdictions: ["de", "bafin"],
+    matchedHomeJurisdictions: ["de", "bafin"],
+    matchedPassportJurisdictions: [],
     matchedTopics: [],
+    criticalProductLineMatched: false,
+    rawImpactScore: 38,
+    impactFloorAdjustment: 0,
     scoringRuleVersion: "mvp-seed-v0",
   },
 ];

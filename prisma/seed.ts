@@ -1,12 +1,16 @@
 import { getTierOneAdapters } from "@/lib/ingestion/adapters";
 import { syncSources, syncTaxonomyConfig, upsertCanonicalPublication } from "@/lib/ingestion/store";
 import type { CanonicalPublication } from "@/lib/ingestion/types";
+import { recalculateImpactScores } from "@/lib/impact-recalculation";
 import { mockPublications } from "@/lib/mock-data";
 import { getPrisma } from "@/lib/prisma";
 import { seedDefaultSavedViews } from "@/lib/saved-views";
+import { loadScoringRules } from "@/lib/scoring-rules";
 
 async function main() {
   const prisma = getPrisma();
+  const seededConfirmationAt = new Date("2026-05-27T00:00:00.000Z");
+  const seededConfirmationDueAt = new Date("2026-08-27T00:00:00.000Z");
   await syncTaxonomyConfig();
   await syncSources(getTierOneAdapters());
   await seedDefaultSavedViews();
@@ -62,11 +66,21 @@ async function main() {
     update: {
       name: "EU crypto and payments footprint",
       isActive: true,
+      topicWatchlist: loadScoringRules().topic_watchlist,
+      confirmationRequired: false,
+      lastConfirmedAt: seededConfirmationAt,
+      nextConfirmationDueAt: seededConfirmationDueAt,
+      confirmedByName: "Pilot Reviewer",
     },
     create: {
       id: "pm_design_partner_main",
       organisationId: organisation.id,
       name: "EU crypto and payments footprint",
+      topicWatchlist: loadScoringRules().topic_watchlist,
+      confirmationRequired: false,
+      lastConfirmedAt: seededConfirmationAt,
+      nextConfirmationDueAt: seededConfirmationDueAt,
+      confirmedByName: "Pilot Reviewer",
       notes: "Seeded MVP product map for local impact-score previews.",
     },
   });
@@ -100,6 +114,48 @@ async function main() {
       activities: ["exchange_crypto_for_fiat", "custody_safekeeping_crypto"],
       customerSegment: ["RETAIL", "PROFESSIONAL"],
       isCritical: true,
+    },
+  });
+
+  await prisma.productMapJurisdiction.upsert({
+    where: {
+      productMapId_jurisdictionCode: {
+        productMapId: productMap.id,
+        jurisdictionCode: "de",
+      },
+    },
+    update: {
+      authority: "bafin",
+      isHomeMember: true,
+      isPassportedInto: false,
+    },
+    create: {
+      productMapId: productMap.id,
+      jurisdictionCode: "de",
+      authority: "bafin",
+      isHomeMember: true,
+      isPassportedInto: false,
+    },
+  });
+
+  await prisma.productMapJurisdiction.upsert({
+    where: {
+      productMapId_jurisdictionCode: {
+        productMapId: productMap.id,
+        jurisdictionCode: "eu",
+      },
+    },
+    update: {
+      authority: "esma",
+      isHomeMember: false,
+      isPassportedInto: true,
+    },
+    create: {
+      productMapId: productMap.id,
+      jurisdictionCode: "eu",
+      authority: "esma",
+      isHomeMember: false,
+      isPassportedInto: true,
     },
   });
 
@@ -176,6 +232,7 @@ async function main() {
   }
 
   for (const source of await prisma.source.findMany()) {
+    const freshnessAt = new Date();
     const reuseStatus =
       source.code === "eurlex"
         ? "REUSE_PERMITTED"
@@ -202,6 +259,29 @@ async function main() {
         nextReviewAt: new Date("2026-08-20T00:00:00.000Z"),
       },
     });
+    await prisma.source.update({
+      where: { id: source.id },
+      data: {
+        lastFetchedAt: freshnessAt,
+        adapterStatusJson: { status: "OK", seeded: true },
+      },
+    });
+    await prisma.fetchRun.deleteMany({
+      where: {
+        sourceId: source.id,
+        errorMessage: "Seeded fixture freshness marker.",
+      },
+    });
+    await prisma.fetchRun.create({
+      data: {
+        sourceId: source.id,
+        startedAt: freshnessAt,
+        finishedAt: freshnessAt,
+        status: "OK",
+        publicationsSeen: 0,
+        errorMessage: "Seeded fixture freshness marker.",
+      },
+    });
   }
 
   for (const provider of ["RESEND", "SLACK", "MS_TEAMS", "HUBSPOT"] as const) {
@@ -226,6 +306,8 @@ async function main() {
       },
     });
   }
+
+  await recalculateImpactScores(organisation.id);
 
   console.log("Seeded taxonomy, Tier 1 sources, design partner, product map, and demo publications.");
 }

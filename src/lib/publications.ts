@@ -30,7 +30,7 @@ type DbPublication = Prisma.PublicationGetPayload<{
       include: { taxonomyVersion: true };
     };
     impactScores: {
-      orderBy: { scoredAt: "desc" };
+      orderBy: { score: "desc" };
       take: 1;
     };
   };
@@ -109,7 +109,12 @@ function mapDbPublication(publication: DbPublication): PublicationListItem {
     matchedLicences: impactScore?.matchedLicences ?? [],
     matchedActivities: impactScore?.matchedActivities ?? [],
     matchedJurisdictions: impactScore?.matchedJurisdictions ?? [],
-    matchedTopics: [],
+    matchedHomeJurisdictions: impactScore?.matchedHomeJurisdictions ?? [],
+    matchedPassportJurisdictions: impactScore?.matchedPassportJurisdictions ?? [],
+    matchedTopics: impactScore?.matchedTopics ?? [],
+    criticalProductLineMatched: impactScore?.criticalProductLineMatched ?? false,
+    rawImpactScore: impactScore?.rawScore ?? 0,
+    impactFloorAdjustment: impactScore?.floorAdjustment ?? 0,
     scoringRuleVersion: impactScore?.ruleVersion ?? "unscored",
   };
 }
@@ -132,7 +137,7 @@ export async function listPublications(filters: PublicationFilters = {}, organis
       },
       impactScores: {
         where: organisationId ? { organisationId } : undefined,
-        orderBy: { scoredAt: "desc" },
+        orderBy: { score: "desc" },
         take: 1,
       },
     },
@@ -160,7 +165,7 @@ export async function getPublication(id: string, organisationId?: string) {
       },
       impactScores: {
         where: organisationId ? { organisationId } : undefined,
-        orderBy: { scoredAt: "desc" },
+        orderBy: { score: "desc" },
         take: 1,
       },
     },

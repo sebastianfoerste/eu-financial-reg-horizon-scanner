@@ -1,13 +1,20 @@
 import Link from "next/link";
-import { Activity, AlertTriangle, CircleAlert, Clock, Database } from "lucide-react";
+import { Activity, AlertTriangle, ArrowRight, CircleAlert, Clock, Database } from "lucide-react";
 
 import { createSavedViewAction } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
 import { PublicationFilters } from "@/components/publication-filters";
 import { PublicationTable } from "@/components/publication-table";
+import { listAlerts } from "@/lib/alerts";
 import { getActiveOrganisationId } from "@/lib/authz";
+import { buildOperatorActions, type OperatorActionTone } from "@/lib/operator-command-center";
+import { getProductMapDeliveryReadiness } from "@/lib/product-maps";
 import { getAvailableFilters, listPublications } from "@/lib/publications";
+import { listReviewQueue } from "@/lib/review";
+import { getRuntimeChecksWithDatabaseProbe } from "@/lib/runtime-hardening";
 import { listSavedViews, savedViewToSearchParams } from "@/lib/saved-views";
+import { summarizeSourceFreshness } from "@/lib/source-health";
+import { listSourceDiligence } from "@/lib/source-diligence";
 
 type PageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -43,15 +50,37 @@ async function LoadedHome({ searchParams }: PageProps) {
     to: readParam(params.to),
   };
   const organisationId = await getActiveOrganisationId();
-  const [publications, filterData, savedViews] = await Promise.all([
+  const [
+    publications,
+    filterData,
+    savedViews,
+    reviewItems,
+    alerts,
+    footprintReadiness,
+    runtimeChecks,
+    sourceDiligence,
+  ] = await Promise.all([
     listPublications(filters, organisationId),
     getAvailableFilters(organisationId),
     listSavedViews(organisationId),
+    listReviewQueue(organisationId),
+    listAlerts(organisationId),
+    getProductMapDeliveryReadiness(organisationId),
+    getRuntimeChecksWithDatabaseProbe(),
+    listSourceDiligence(),
   ]);
   const highImpactCount = publications.filter((publication) =>
     ["CRITICAL", "HIGH"].includes(publication.impactBucket),
   ).length;
   const sourceCount = new Set(publications.map((publication) => publication.sourceCode)).size;
+  const operatorActions = buildOperatorActions({
+    highImpactCount,
+    reviewItems,
+    alerts,
+    sourceFreshness: summarizeSourceFreshness(sourceDiligence),
+    footprintReadiness,
+    runtimeChecks,
+  });
 
   return (
     <AppShell active="/">
@@ -87,16 +116,51 @@ async function LoadedHome({ searchParams }: PageProps) {
           </div>
         </section>
 
+        <section className="rounded-md border border-zinc-200 bg-white p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-normal text-teal-700">Action queue</p>
+              <h2 className="mt-1 text-lg font-semibold text-zinc-950">What needs attention first</h2>
+            </div>
+            <Link
+              href="/review"
+              className="inline-flex h-9 items-center gap-2 rounded-md border border-zinc-300 bg-white px-3 text-sm font-semibold text-zinc-900 hover:bg-zinc-50"
+            >
+              Review queue
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </Link>
+          </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            {operatorActions.slice(0, 3).map((action) => (
+              <Link
+                key={action.key}
+                href={action.href}
+                className={`rounded-md border p-3 hover:border-zinc-400 ${actionToneClasses[action.tone]}`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold">{action.title}</p>
+                    <p className="mt-1 text-xs leading-5 opacity-80">{action.detail}</p>
+                  </div>
+                  <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-md bg-white/80 px-2 text-sm font-semibold text-zinc-950">
+                    {action.metric}
+                  </span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+
         <section className="grid gap-3 md:grid-cols-4">
           {savedViews.map((view) => (
-            <a
+            <Link
               key={view.id}
               href={`/?${savedViewToSearchParams(view.filters)}`}
               className="rounded-md border border-zinc-200 bg-white p-3 hover:border-zinc-400"
             >
               <p className="text-sm font-semibold text-zinc-950">{view.name}</p>
               <p className="mt-1 text-xs leading-5 text-zinc-500">{view.description}</p>
-            </a>
+            </Link>
           ))}
         </section>
 
@@ -134,6 +198,13 @@ async function LoadedHome({ searchParams }: PageProps) {
     </AppShell>
   );
 }
+
+const actionToneClasses: Record<OperatorActionTone, string> = {
+  urgent: "border-red-200 bg-red-50 text-red-950",
+  warning: "border-amber-200 bg-amber-50 text-amber-950",
+  normal: "border-zinc-200 bg-zinc-50 text-zinc-950",
+  success: "border-teal-200 bg-teal-50 text-teal-950",
+};
 
 function DashboardUnavailable() {
   return (

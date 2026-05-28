@@ -14,17 +14,24 @@ export function buildScoreExplanation(input: {
   matchedLicences?: string[];
   matchedActivities?: string[];
   matchedJurisdictions?: string[];
+  matchedHomeJurisdictions?: string[];
+  matchedPassportJurisdictions?: string[];
   matchedTopics?: string[];
   criticalProductLineMatched?: boolean;
+  floorAdjustment?: number;
 }) {
   const rules = loadScoringRules();
   const floor = rules.publication_type_floor[input.publicationType] ?? 0;
   const matchedLicences = input.matchedLicences ?? [];
   const matchedActivities = input.matchedActivities ?? [];
   const matchedJurisdictions = input.matchedJurisdictions ?? [];
-  const matchedTopics =
-    input.matchedTopics ??
-    input.classification.topicPaths.filter((topic) => rules.topic_watchlist.includes(topic));
+  const matchedHomeJurisdictions = input.matchedHomeJurisdictions ?? [];
+  const matchedPassportJurisdictions = input.matchedPassportJurisdictions ?? [];
+  const matchedTopics = input.matchedTopics ?? [];
+  const floorAdjustment = input.floorAdjustment ?? 0;
+  const jurisdictionPoints =
+    (matchedHomeJurisdictions.length ? rules.weights.jurisdiction_home_match : 0) +
+    (matchedPassportJurisdictions.length ? rules.weights.jurisdiction_passported_match : 0);
 
   const items: ScoreExplanationItem[] = [
     {
@@ -42,7 +49,7 @@ export function buildScoreExplanation(input: {
     {
       label: "Jurisdiction match",
       value: matchedJurisdictions.join(", ") || "No jurisdiction overlap",
-      points: matchedJurisdictions.length ? rules.weights.jurisdiction_home_match : 0,
+      points: jurisdictionPoints,
       matched: matchedJurisdictions.length > 0,
     },
     {
@@ -59,9 +66,9 @@ export function buildScoreExplanation(input: {
     },
     {
       label: "Publication-type floor",
-      value: input.publicationType,
-      points: floor,
-      matched: floor > 0,
+      value: floorAdjustment ? `${input.publicationType} floor ${floor} applied` : `No uplift for ${input.publicationType}`,
+      points: floorAdjustment,
+      matched: floorAdjustment > 0,
     },
   ];
 
