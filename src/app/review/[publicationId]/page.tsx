@@ -261,3 +261,42 @@ function Textarea({ name, label, defaultValue }: { name: string; label: string; 
     </label>
   );
 }
+
+const readinessStatusClasses: Record<ReviewReadinessStatus, string> = {
+  PASS: "border-teal-200 bg-teal-50 text-teal-800",
+  WARN: "border-amber-200 bg-amber-50 text-amber-900",
+  BLOCK: "border-red-200 bg-red-50 text-red-800",
+};
+
+function ReadinessIcon({ status }: { status: ReviewReadinessStatus }) {
+  if (status === "PASS") return <CheckCircle2 className="h-4 w-4" aria-hidden="true" />;
+  if (status === "WARN") return <TriangleAlert className="h-4 w-4" aria-hidden="true" />;
+  return <CircleAlert className="h-4 w-4" aria-hidden="true" />;
+}
+
+function ReadinessCheckRow({
+  status,
+  label,
+  detail,
+}: {
+  status: ReviewReadinessStatus;
+  label: string;
+  detail: string;
+}) {
+  return (
+    <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-3 rounded-md border border-zinc-200 bg-zinc-50 p-3">
+      <span
+        className={cn(
+          "mt-0.5 inline-flex h-7 w-7 items-center justify-center rounded-md border",
+          readinessStatusClasses[status],
+        )}
+      >
+        <ReadinessIcon status={status} />
+      </span>
+      <div className="min-w-0">
+        <p className="text-sm font-semibold text-zinc-950">{label}</p>
+        <p className="mt-1 text-xs leading-5 text-zinc-600">{detail}</p>
+      </div>
+    </div>
+  );
+}

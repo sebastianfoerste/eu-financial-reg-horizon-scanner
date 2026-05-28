@@ -12,7 +12,6 @@ export type ReviewReadinessCheck = {
 const approvedStatuses = new Set(["APPROVED"]);
 const closedStatuses = new Set(["FALSE_POSITIVE", "ARCHIVED"]);
 const placeholderSignals = [
-  "pending",
   "not run",
   "not produced",
   "no change summary",
