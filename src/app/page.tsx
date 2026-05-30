@@ -5,6 +5,7 @@ import { createSavedViewAction } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
 import { PublicationFilters } from "@/components/publication-filters";
 import { PublicationTable } from "@/components/publication-table";
+import { listLatestAgentArtifacts } from "@/lib/agents/runner";
 import { listAlerts } from "@/lib/alerts";
 import { getActiveOrganisationId } from "@/lib/authz";
 import { buildOperatorActions, type OperatorActionTone } from "@/lib/operator-command-center";
@@ -59,6 +60,7 @@ async function LoadedHome({ searchParams }: PageProps) {
     footprintReadiness,
     runtimeChecks,
     sourceDiligence,
+    agentArtifacts,
   ] = await Promise.all([
     listPublications(filters, organisationId),
     getAvailableFilters(organisationId),
@@ -68,6 +70,7 @@ async function LoadedHome({ searchParams }: PageProps) {
     getProductMapDeliveryReadiness(organisationId),
     getRuntimeChecksWithDatabaseProbe(),
     listSourceDiligence(),
+    listLatestAgentArtifacts({ organisationId, take: 6 }),
   ]);
   const highImpactCount = publications.filter((publication) =>
     ["CRITICAL", "HIGH"].includes(publication.impactBucket),
@@ -148,6 +151,41 @@ async function LoadedHome({ searchParams }: PageProps) {
                 </div>
               </Link>
             ))}
+          </div>
+        </section>
+
+        <section className="rounded-md border border-zinc-200 bg-white p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-normal text-teal-700">Agent handoff</p>
+              <h2 className="mt-1 text-lg font-semibold text-zinc-950">Latest draft findings and suggestions</h2>
+            </div>
+            <Link
+              href="/agents"
+              className="inline-flex h-9 items-center gap-2 rounded-md border border-zinc-300 bg-white px-3 text-sm font-semibold text-zinc-900 hover:bg-zinc-50"
+            >
+              Agent control room
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </Link>
+          </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            {agentArtifacts.slice(0, 3).map((artifact) => (
+              <Link
+                key={artifact.id}
+                href={`/agents/${artifact.agentRunId}`}
+                className="rounded-md border border-zinc-200 bg-zinc-50 p-3 hover:border-zinc-400"
+              >
+                <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+                  <span className="font-semibold uppercase text-zinc-700">{artifact.type}</span>
+                  <span>{artifact.status}</span>
+                </div>
+                <p className="text-sm font-semibold text-zinc-950">{artifact.title}</p>
+                <p className="mt-1 text-xs leading-5 text-zinc-600">{artifact.summary}</p>
+              </Link>
+            ))}
+            {agentArtifacts.length === 0 ? (
+              <p className="text-sm text-zinc-500">Run enabled agents to generate draft findings for review.</p>
+            ) : null}
           </div>
         </section>
 

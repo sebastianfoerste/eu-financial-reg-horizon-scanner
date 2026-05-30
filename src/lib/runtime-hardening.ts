@@ -53,6 +53,28 @@ export function getRuntimeChecks(): RuntimeCheck[] {
           : "AI Gateway selected without complete model and authentication configuration."
         : "Deterministic publication classification is active.",
     },
+    {
+      key: "agents",
+      label: "Agents",
+      ok: env.HORIZON_AGENTS_ENABLED,
+      severity: isProduction ? "warning" : "info",
+      message: env.HORIZON_AGENTS_ENABLED
+        ? env.HORIZON_AGENT_AUTORUN_ENABLED
+          ? "Agent execution and scheduled autorun are enabled."
+          : "Agent execution is enabled. Scheduled autorun remains disabled."
+        : "Agent execution is disabled.",
+    },
+    {
+      key: "agent-llm",
+      label: "Agent LLM policy",
+      ok: !env.HORIZON_AGENT_LLM_ENABLED || aiGatewayAuthenticated,
+      severity: env.HORIZON_AGENT_LLM_ENABLED ? "warning" : "info",
+      message: env.HORIZON_AGENT_LLM_ENABLED
+        ? aiGatewayAuthenticated
+          ? "Publication-only agent LLM calls can use configured AI Gateway credentials."
+          : "Agent LLM calls are enabled without AI Gateway authentication."
+        : "Agent LLM calls are disabled. Deterministic agent output is active.",
+    },
   ];
 }
 

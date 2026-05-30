@@ -6,6 +6,7 @@ import { decideReviewAction, reclassifyPublicationAction } from "@/app/review/ac
 import { AppShell } from "@/components/app-shell";
 import { ImpactExplanationPanel } from "@/components/impact-explanation-panel";
 import { StatusBadge } from "@/components/status-badge";
+import { listLatestAgentArtifacts } from "@/lib/agents/runner";
 import { requireInternalOperator } from "@/lib/authz";
 import { getReviewItem } from "@/lib/review";
 import { summarizeReviewReadiness, type ReviewReadinessStatus } from "@/lib/review-readiness";
@@ -24,6 +25,11 @@ export default async function ReviewDetailPage({ params }: ReviewDetailProps) {
   const item = await getReviewItem(publicationId, organisationId);
   if (!item) notFound();
   const publication = item.publication;
+  const agentArtifacts = await listLatestAgentArtifacts({
+    organisationId,
+    publicationId: publication.id,
+    take: 6,
+  });
   const readiness = summarizeReviewReadiness(item);
 
   return (
@@ -152,6 +158,30 @@ export default async function ReviewDetailPage({ params }: ReviewDetailProps) {
             </section>
 
             <ImpactExplanationPanel publication={publication} />
+
+            <section className="rounded-md border border-zinc-200 bg-white p-5">
+              <h2 className="text-sm font-semibold uppercase tracking-normal text-zinc-500">Agent suggestions</h2>
+              <div className="mt-4 space-y-3">
+                {agentArtifacts.length ? (
+                  agentArtifacts.map((artifact) => (
+                    <Link
+                      key={artifact.id}
+                      href={`/agents/${artifact.agentRunId}`}
+                      className="block rounded-md border border-zinc-200 bg-zinc-50 p-3 hover:border-zinc-400"
+                    >
+                      <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+                        <span className="font-semibold uppercase text-zinc-700">{artifact.type}</span>
+                        <span>{artifact.status}</span>
+                      </div>
+                      <p className="text-sm font-semibold text-zinc-950">{artifact.title}</p>
+                      <p className="mt-1 text-xs leading-5 text-zinc-600">{artifact.summary}</p>
+                    </Link>
+                  ))
+                ) : (
+                  <p className="text-sm text-zinc-500">Run the review QA or classification triage agent to attach suggestions.</p>
+                )}
+              </div>
+            </section>
 
             <section className="rounded-md border border-zinc-200 bg-white p-5">
               <h2 className="text-sm font-semibold uppercase tracking-normal text-zinc-500">Correction history</h2>

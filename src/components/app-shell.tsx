@@ -1,12 +1,28 @@
 import Link from "next/link";
-import { Bell, BookOpenCheck, ClipboardCheck, Database, FileText, Map, PlugZap, Radar, ScrollText } from "lucide-react";
+import {
+  Bell,
+  BookOpenCheck,
+  Bot,
+  BriefcaseBusiness,
+  ClipboardCheck,
+  Database,
+  FileText,
+  Gauge,
+  Map,
+  PlugZap,
+  Radar,
+  ScrollText,
+} from "lucide-react";
 
 import { AuthControls } from "@/components/auth-controls";
 import { getShellRuntimeStatus } from "@/lib/runtime-shell";
 import { cn } from "@/lib/utils";
 
 const navItems = [
+  { href: "/briefing", label: "Briefing", icon: Gauge },
   { href: "/", label: "Publications", icon: FileText },
+  { href: "/law-firm", label: "Law firm", icon: BriefcaseBusiness },
+  { href: "/agents", label: "Agents", icon: Bot },
   { href: "/review", label: "Review", icon: ClipboardCheck },
   { href: "/product-maps", label: "Product maps", icon: Map },
   { href: "/alerts", label: "Alerts", icon: Bell },

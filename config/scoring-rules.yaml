@@ -1,5 +1,5 @@
 version: "2026.05.20-mvp"
-maintainer: "Sebastian Foerste"
+maintainer: "Alex Vance"
 
 weights:
   licence_match: 45

@@ -1,0 +1,135 @@
+version: "2026.05.28"
+agents:
+  - id: source-monitor
+    kind: SOURCE_MONITOR
+    name: Source Monitor Agent
+    description: Watches source freshness, diligence posture, failed fetches, and polling cadence issues.
+    version: source-monitor-v1
+    enabled: true
+    schedule: "*/60 * * * *"
+    llmPolicy: NONE
+    maxRuntimeSeconds: 45
+    maxCostCents: 0
+    capabilities:
+      - source:read
+      - source_finding:create
+      - source_diligence:read
+      - audit:write
+  - id: review-qa
+    kind: REVIEW_QA
+    name: Review QA Agent
+    description: Checks review queue readiness and drafts reviewer checklist findings.
+    version: review-qa-v1
+    enabled: true
+    llmPolicy: NONE
+    maxRuntimeSeconds: 45
+    maxCostCents: 0
+    capabilities:
+      - publication:read
+      - review_queue:read
+      - review_suggestion:create
+      - audit:write
+  - id: briefing
+    kind: BRIEFING
+    name: Pilot Briefing Agent
+    description: Produces an internal briefing artifact from publications, review posture, source freshness, alerts, and product-map readiness.
+    version: briefing-v1
+    enabled: true
+    llmPolicy: NONE
+    maxRuntimeSeconds: 60
+    maxCostCents: 0
+    capabilities:
+      - publication:read
+      - review_queue:read
+      - alert:read
+      - source:read
+      - product_map:read_local
+      - briefing_artifact:create
+      - audit:write
+  - id: classification-triage
+    kind: CLASSIFICATION_TRIAGE
+    name: Classification Triage Agent
+    description: Suggests taxonomy-backed classification improvements for public regulatory publications.
+    version: classification-triage-v1
+    enabled: true
+    llmPolicy: PUBLICATION_ONLY
+    maxRuntimeSeconds: 90
+    maxCostCents: 100
+    capabilities:
+      - publication:read
+      - taxonomy:read
+      - review_suggestion:create
+      - ai:publication_only
+      - audit:write
+  - id: diff-explainer
+    kind: DIFF_EXPLAINER
+    name: Diff Explainer Agent
+    description: Converts paragraph-level diffs into reviewer-facing change findings.
+    version: diff-explainer-v1
+    enabled: true
+    llmPolicy: PUBLICATION_ONLY
+    maxRuntimeSeconds: 60
+    maxCostCents: 75
+    capabilities:
+      - publication:read
+      - paragraph_diff:read
+      - review_suggestion:create
+      - ai:publication_only
+      - audit:write
+  - id: impact-explanation
+    kind: IMPACT_EXPLANATION
+    name: Impact Explanation Agent
+    description: Drafts local explanations from persisted deterministic impact-score components.
+    version: impact-explanation-v1
+    enabled: true
+    llmPolicy: NONE
+    maxRuntimeSeconds: 45
+    maxCostCents: 0
+    capabilities:
+      - publication:read
+      - impact_score:read
+      - impact_explanation:create
+      - audit:write
+  - id: alert-draft
+    kind: ALERT_DRAFT
+    name: Alert Draft Agent
+    description: Prepares alert draft artifacts from approved reviewed content without approval or delivery authority.
+    version: alert-draft-v1
+    enabled: true
+    llmPolicy: NONE
+    maxRuntimeSeconds: 60
+    maxCostCents: 0
+    capabilities:
+      - publication:read
+      - review_queue:read
+      - alert_draft:create
+      - delivery:send_blocked
+      - audit:write
+  - id: service-routing
+    kind: SERVICE_ROUTING
+    name: Service Routing Agent
+    description: Finds missing or weak service catalogue matches and drafts rule suggestions.
+    version: service-routing-v1
+    enabled: true
+    llmPolicy: NONE
+    maxRuntimeSeconds: 60
+    maxCostCents: 0
+    capabilities:
+      - publication:read
+      - service_catalogue:read
+      - service_rule_suggestion:create
+      - audit:write
+  - id: audit-qa
+    kind: AUDIT_QA
+    name: Audit QA Agent
+    description: Flags stale drafts, failed sends, old review items, and risky workflow sequences from the audit trail.
+    version: audit-qa-v1
+    enabled: true
+    llmPolicy: NONE
+    maxRuntimeSeconds: 45
+    maxCostCents: 0
+    capabilities:
+      - audit:read
+      - alert:read
+      - review_queue:read
+      - source_finding:create

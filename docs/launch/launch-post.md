@@ -22,7 +22,7 @@ What it does:
 
 → Diffs updated documents at paragraph level, so the three sentences that moved in a 47-page Q&A revision arrive in your inbox already underlined
 
-→ Routes every high-impact alert into a fixed-fee gunnercooke remediation package, price visible on the alert
+→ Routes every high-impact alert into a fixed-fee apexlaw remediation package, price visible on the alert
 
 Why it lives inside the firm rather than as a standalone SaaS:
 
@@ -54,7 +54,7 @@ Drop "SCANNER" in the comments and I will send the brief.
 
 ## Visual suggestion
 
-A single carousel slide built on the gunnercooke template (crimson background, diagonal lines, circular headshot, wordmark) showing a stylised side-by-side: left panel "47-page ESMA Q&A revision," right panel "3 sentences that moved." Above both panels in white: "The job is finding the diff."
+A single carousel slide built on the apexlaw template (crimson background, diagonal lines, circular headshot, wordmark) showing a stylised side-by-side: left panel "47-page ESMA Q&A revision," right panel "3 sentences that moved." Above both panels in white: "The job is finding the diff."
 
 Alternative: a screenshot of an actual scanner alert with sensitive content redacted, showing the impact score, the matched licence, the paragraph diff, and the fixed-fee CTA button. Screenshots of working product outperform mockups for credibility.
 

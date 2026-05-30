@@ -6,7 +6,7 @@
 # the version below for reproducibility.
 
 version: "2026.05.27"
-maintainer: "Sebastian Foerste"
+maintainer: "Alex Vance"
 review_cadence: "weekly during build phase, monthly after month 6"
 
 # ---------------------------------------------------------------------------
@@ -543,7 +543,7 @@ urgency_weights:
 
 # ---------------------------------------------------------------------------
 # Service offering mapping
-# Every classification can route to a fixed-fee gunnercooke package.
+# Every classification can route to a fixed-fee apexlaw package.
 # Update as the service catalogue evolves.
 # ---------------------------------------------------------------------------
 service_offerings:

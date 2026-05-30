@@ -6,6 +6,7 @@ import { ActionNotice } from "@/components/action-notice";
 import { AppShell } from "@/components/app-shell";
 import { ProductMapConfirmationBadge } from "@/components/product-map-confirmation-badge";
 import { StatusBadge } from "@/components/status-badge";
+import { listLatestAgentArtifacts } from "@/lib/agents/runner";
 import { canApproveAlertStatus, listAlerts } from "@/lib/alerts";
 import { getActiveOrganisationId } from "@/lib/authz";
 import { listIntegrationDiagnostics } from "@/lib/delivery";
@@ -46,12 +47,14 @@ function getAlertNotice(params: Record<string, string | string[] | undefined>) {
 export default async function AlertsPage({ searchParams }: AlertsPageProps) {
   const notice = getAlertNotice(await searchParams);
   const organisationId = await getActiveOrganisationId();
-  const [alerts, integrations, footprintReadiness] = await Promise.all([
+  const [alerts, integrations, footprintReadiness, agentArtifacts] = await Promise.all([
     listAlerts(organisationId),
     listIntegrationDiagnostics(organisationId),
     getProductMapDeliveryReadiness(organisationId),
+    listLatestAgentArtifacts({ organisationId, take: 8 }),
   ]);
   const openDrafts = alerts.filter((alert) => alert.status === "DRAFT").length;
+  const alertDraftArtifacts = agentArtifacts.filter((artifact) => artifact.type === "ALERT_DRAFT").slice(0, 3);
 
   return (
     <AppShell active="/alerts">
@@ -109,6 +112,42 @@ export default async function AlertsPage({ searchParams }: AlertsPageProps) {
               </p>
             </div>
           ))}
+        </section>
+
+        <section className="rounded-md border border-zinc-200 bg-white p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold uppercase tracking-normal text-zinc-500">Agent alert previews</h2>
+              <p className="mt-1 text-sm text-zinc-600">
+                Agent artifacts remain draft previews. The reviewed alert workflow below controls approval and delivery.
+              </p>
+            </div>
+            <Link
+              href="/agents"
+              className="inline-flex h-9 items-center rounded-md border border-zinc-300 bg-white px-3 text-sm font-semibold text-zinc-900 hover:bg-zinc-50"
+            >
+              Open agents
+            </Link>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            {alertDraftArtifacts.map((artifact) => (
+              <Link
+                key={artifact.id}
+                href={`/agents/${artifact.agentRunId}`}
+                className="rounded-md border border-zinc-200 bg-zinc-50 p-3 hover:border-zinc-400"
+              >
+                <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+                  <span>{artifact.status}</span>
+                  <span>{artifact.agentName}</span>
+                </div>
+                <p className="text-sm font-semibold text-zinc-950">{artifact.title}</p>
+                <p className="mt-1 text-xs leading-5 text-zinc-600">{artifact.summary}</p>
+              </Link>
+            ))}
+            {alertDraftArtifacts.length === 0 ? (
+              <p className="text-sm text-zinc-500">No agent alert previews have been created yet.</p>
+            ) : null}
+          </div>
         </section>
 
         <section className="overflow-hidden rounded-md border border-zinc-200 bg-white">

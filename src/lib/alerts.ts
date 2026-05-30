@@ -7,6 +7,8 @@ import { assertDemoModeAllowed, hasDatabaseUrl } from "@/lib/env";
 import { mockPublications } from "@/lib/mock-data";
 import { getPrisma } from "@/lib/prisma";
 import { getProductMapDeliveryReadiness } from "@/lib/product-maps";
+import { getReviewItem } from "@/lib/review";
+import { summarizeReviewReadiness } from "@/lib/review-readiness";
 import { getRoutedServiceOfferings } from "@/lib/service-offerings";
 
 const reviewedDeliveryChannels: AlertChannel[] = ["EMAIL_REALTIME", "SLACK", "MS_TEAMS", "HUBSPOT"];
@@ -258,17 +260,20 @@ export async function generateAlertDrafts(input: {
       ? await prisma.organisation.findUnique({ where: { id: organisationId } })
       : await prisma.organisation.findFirst({ orderBy: { createdAt: "asc" } })) ??
     (await prisma.organisation.create({ data: { name: "Pilot organisation", tier: "TRIAL" } }));
-  const readiness = await getProductMapDeliveryReadiness(organisation.id);
-  if (!readiness.ready) {
+  const footprintReadiness = await getProductMapDeliveryReadiness(organisation.id);
+  if (!footprintReadiness.ready) {
     await writeAuditLog({
       action: "alert.generate.blocked",
       entityType: "organisation",
       entityId: organisation.id,
       organisationId: organisation.id,
       actorUserId: operator.userId,
-      payloadJson: { reason: readiness.message, blockingProductMaps: readiness.blockingMaps.length },
+      payloadJson: {
+        reason: footprintReadiness.message,
+        blockingProductMaps: footprintReadiness.blockingMaps.length,
+      },
     });
-    return { created: 0, skipped: 0, mode: "database" as const, blockedReason: readiness.message };
+    return { created: 0, skipped: 0, mode: "database" as const, blockedReason: footprintReadiness.message };
   }
   const channels = input.channels?.length ? input.channels : reviewedDeliveryChannels;
   const unsupportedChannel = channels.find((channel) => !reviewedDeliveryChannels.includes(channel));
@@ -299,7 +304,16 @@ export async function generateAlertDrafts(input: {
 
   let created = 0;
   let skipped = 0;
+  let readinessSkipped = 0;
   for (const publication of publications) {
+    const reviewItem = await getReviewItem(publication.id, organisation.id);
+    const reviewReadiness = reviewItem ? summarizeReviewReadiness(reviewItem) : null;
+    if (!reviewReadiness?.readyForAlertDraft) {
+      skipped += channels.length;
+      readinessSkipped += 1;
+      continue;
+    }
+
     const serviceOfferings = await getRoutedServiceOfferings(
       publication.classifications[0]?.serviceOfferingIds ?? [],
     );
@@ -349,7 +363,7 @@ export async function generateAlertDrafts(input: {
     entityId: organisation.id,
     organisationId: organisation.id,
     actorUserId: operator.userId,
-    payloadJson: { created, skipped, channels },
+    payloadJson: { created, skipped, readinessSkipped, channels },
   });
 
   return { created, skipped, mode: "database" as const };

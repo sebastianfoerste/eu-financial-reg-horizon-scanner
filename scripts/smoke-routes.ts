@@ -9,7 +9,12 @@ const baseUrl =
   "http://localhost:3000";
 
 const routes: SmokeRoute[] = [
-  { path: "/", expected: ["scanner cockpit", "save current view"] },
+  { path: "/briefing", expected: ["pilot briefing room", "impact queue"] },
+  { path: "/", expected: ["scanner cockpit", "agent handoff", "save current view"] },
+  { path: "/law-firm", expected: ["law firm workbench", "detailed implementation plan", "priority matter board"] },
+  { path: "/law-firm/matter-casp-zag-authorisation", expected: ["matter command center", "client brief drafts"] },
+  { path: "/agents", expected: ["agent control room", "agent registry", "run enabled agents"] },
+  { path: "/agents/agent-demo-review-qa", expected: ["run steps", "artifacts", "apply as in-app draft"] },
   { path: "/review", expected: ["review queue", "approved content"] },
   { path: "/review/pub-esma-qa-2845", expected: ["classification correction", "impact explanation"] },
   { path: "/alerts", expected: ["alert drafts", "send reviewed alert"] },

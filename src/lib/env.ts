@@ -26,11 +26,24 @@ const EnvSchema = z.object({
     .transform((value) => parseBooleanFlag(value, true)),
   HORIZON_BOT_USER_AGENT: z
     .string()
-    .default("EUFinancialRegHorizonScanner/0.1 (+https://gunnercooke.com)"),
+    .default("EUFinancialRegHorizonScanner/0.1 (+https://apexlaw.com)"),
   AI_GATEWAY_API_KEY: z.string().optional(),
   VERCEL_OIDC_TOKEN: z.string().optional(),
   HORIZON_AI_PROVIDER: z.enum(["stub", "gateway"]).default("stub"),
   HORIZON_AI_MODEL: z.string().default("stub-classifier-v0"),
+  HORIZON_AGENTS_ENABLED: z
+    .string()
+    .optional()
+    .transform((value) => parseBooleanFlag(value, process.env.NODE_ENV !== "production")),
+  HORIZON_AGENT_AUTORUN_ENABLED: z
+    .string()
+    .optional()
+    .transform((value) => parseBooleanFlag(value, false)),
+  HORIZON_AGENT_LLM_ENABLED: z
+    .string()
+    .optional()
+    .transform((value) => parseBooleanFlag(value, false)),
+  HORIZON_AGENT_MAX_COST_CENTS_PER_RUN: z.coerce.number().int().nonnegative().default(100),
 });
 
 let cachedEnv: z.infer<typeof EnvSchema> | null = null;

@@ -223,10 +223,10 @@ export async function listReviewQueue(organisationId?: string) {
     return mockPublications.map((publication, index) => ({
       id: `review-${publication.id}`,
       publicationId: publication.id,
-      status: (index === 0 ? "PENDING" : "IN_REVIEW") as ReviewStatus,
+      status: (index === 0 ? "APPROVED" : "IN_REVIEW") as ReviewStatus,
       priority: publication.impactScore,
-      reviewerName: null,
-      decisionReason: null,
+      reviewerName: index === 0 ? "Sebastian" : null,
+      decisionReason: index === 0 ? "Demo approval for local agent workflow checks." : null,
       updatedAt: publication.fetchedAt,
       publication,
       revisions: [],
@@ -272,10 +272,11 @@ export async function getReviewItem(publicationId: string, organisationId?: stri
     return {
       id: `review-${publication.id}`,
       publicationId: publication.id,
-      status: "PENDING" as ReviewStatus,
+      status: publication.id === mockPublications[0]?.id ? ("APPROVED" as ReviewStatus) : ("PENDING" as ReviewStatus),
       priority: publication.impactScore,
-      reviewerName: null,
-      decisionReason: null,
+      reviewerName: publication.id === mockPublications[0]?.id ? "Sebastian" : null,
+      decisionReason:
+        publication.id === mockPublications[0]?.id ? "Demo approval for local agent workflow checks." : null,
       updatedAt: publication.fetchedAt,
       publication,
       revisions: [],

@@ -6,6 +6,7 @@ import { AppShell } from "@/components/app-shell";
 import { ImpactExplanationPanel } from "@/components/impact-explanation-panel";
 import { StatusBadge } from "@/components/status-badge";
 import { TagList } from "@/components/tag-list";
+import { listLatestAgentArtifacts } from "@/lib/agents/runner";
 import { getActiveOrganisationId } from "@/lib/authz";
 import { getPublication, getPublicationParagraphDiffs, getPublicationVersions } from "@/lib/publications";
 import { getRoutedServiceOfferings } from "@/lib/service-offerings";
@@ -18,17 +19,18 @@ type DetailProps = {
 export default async function PublicationDetailPage({ params }: DetailProps) {
   const { id } = await params;
   const organisationId = await getActiveOrganisationId();
-  const [publication, versions, paragraphDiffs] = await Promise.all([
+  const [publication, versions, paragraphDiffs, agentArtifacts] = await Promise.all([
     getPublication(id, organisationId),
     getPublicationVersions(id),
     getPublicationParagraphDiffs(id),
+    listLatestAgentArtifacts({ organisationId, publicationId: id, take: 6 }),
   ]);
 
   if (!publication) notFound();
 
   const offerings = await getRoutedServiceOfferings(publication.serviceOfferingIds);
   const consultationUrl =
-    offerings.find((offering) => offering.calendlyUrl)?.calendlyUrl ?? "https://www.gunnercooke.com";
+    offerings.find((offering) => offering.calendlyUrl)?.calendlyUrl ?? "https://www.apexlaw.com";
 
   return (
     <AppShell active="/">
@@ -138,6 +140,30 @@ export default async function PublicationDetailPage({ params }: DetailProps) {
 
           <aside className="min-w-0 space-y-4">
             <ImpactExplanationPanel publication={publication} />
+
+            <div className="rounded-md border border-zinc-200 bg-white p-5">
+              <h2 className="text-sm font-semibold uppercase tracking-normal text-zinc-500">Agent suggestions</h2>
+              <div className="mt-4 space-y-3">
+                {agentArtifacts.length ? (
+                  agentArtifacts.map((artifact) => (
+                    <Link
+                      key={artifact.id}
+                      href={`/agents/${artifact.agentRunId}`}
+                      className="block rounded-md border border-zinc-200 bg-zinc-50 p-3 hover:border-zinc-400"
+                    >
+                      <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+                        <span className="font-semibold uppercase text-zinc-700">{artifact.type}</span>
+                        <span>{artifact.status}</span>
+                      </div>
+                      <p className="text-sm font-semibold text-zinc-950">{artifact.title}</p>
+                      <p className="mt-1 text-xs leading-5 text-zinc-600">{artifact.summary}</p>
+                    </Link>
+                  ))
+                ) : (
+                  <p className="text-sm text-zinc-500">No agent artifacts are attached to this publication yet.</p>
+                )}
+              </div>
+            </div>
 
             <div className="rounded-md border border-zinc-200 bg-white p-5">
               <h2 className="text-sm font-semibold uppercase tracking-normal text-zinc-500">Taxonomy</h2>

@@ -48,6 +48,7 @@ model Organisation {
   id              String         @id @default(cuid())
   externalId      String?        @unique
   name            String
+  tenantKind      OrganisationTenantKind @default(REGULATED_ENTITY)
   legalName       String?
   registeredSeat  String?
   vatId           String?
@@ -68,8 +69,24 @@ model Organisation {
   apiTokens       ApiToken[]
   savedViews      SavedView[]
   integrationConfigs IntegrationConfig[]
+  lawFirmClients  LawFirmClient[] @relation("FirmClientRecords")
+  linkedLawFirmClientRecords LawFirmClient[] @relation("LinkedClientOrganisation")
+  practiceGroups  PracticeGroup[]
+  firmMatters     FirmMatter[] @relation("FirmMatterOrganisation")
+  clientBriefs    ClientBrief[] @relation("FirmClientBriefs")
+  knowledgeAssets KnowledgeAsset[] @relation("FirmKnowledgeAssets")
+  regulatoryPlaybooks RegulatoryPlaybook[] @relation("FirmPlaybooks")
+  commercialOpportunities CommercialOpportunity[] @relation("FirmOpportunities")
 
   @@index([name])
+  @@index([tenantKind])
+}
+
+enum OrganisationTenantKind {
+  REGULATED_ENTITY
+  LAW_FIRM
+  COMPLIANCE_CONSULTANCY
+  INTERNAL
 }
 
 enum SubscriptionTier {
@@ -297,6 +314,10 @@ model Publication {
   paragraphs      PublicationParagraph[]
   paragraphDiffs  ParagraphDiff[]
   classificationRevisions ClassificationRevision[]
+  matterLinks      MatterPublication[]
+  clientBriefs     ClientBrief[]
+  knowledgeAssets  KnowledgeAsset[]
+  commercialOpportunities CommercialOpportunity[]
 
   @@unique([sourceId, externalId])
   @@unique([sourceUrl, rawHash])
@@ -645,6 +666,7 @@ model ServiceOffering {
 
   leads          ServiceLead[]
   rules          ServiceOfferingRule[]
+  commercialOpportunities CommercialOpportunity[]
 }
 
 model ServiceOfferingRule {
@@ -777,6 +799,312 @@ model SavedView {
   @@index([organisationId, isDefault])
 }
 
+// ---------------------------------------------------------------------------
+// Law firm operating layer
+// ---------------------------------------------------------------------------
+
+model LawFirmClient {
+  id                    String       @id @default(cuid())
+  firmOrganisationId    String
+  linkedOrganisationId  String?
+  displayName           String
+  legalName             String?
+  sector                String?
+  relationshipPartnerName String
+  responsibleAssociateName String?
+  confidentialityLevel  ConfidentialityLevel @default(CONFIDENTIAL)
+  defaultAccessPolicy   AccessPolicy @default(FIRM_INTERNAL)
+  notes                 String?      @db.Text
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  firmOrganisation      Organisation @relation("FirmClientRecords", fields: [firmOrganisationId], references: [id], onDelete: Cascade)
+  linkedOrganisation    Organisation? @relation("LinkedClientOrganisation", fields: [linkedOrganisationId], references: [id], onDelete: SetNull)
+  matters               FirmMatter[]
+  commercialOpportunities CommercialOpportunity[]
+
+  @@unique([firmOrganisationId, displayName])
+  @@index([firmOrganisationId])
+  @@index([confidentialityLevel])
+}
+
+model PracticeGroup {
+  id                    String       @id @default(cuid())
+  firmOrganisationId    String
+  name                  String
+  slug                  String
+  focusDescription      String       @db.Text
+  leadPartnerName       String
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  firmOrganisation      Organisation @relation(fields: [firmOrganisationId], references: [id], onDelete: Cascade)
+  matters               FirmMatter[]
+  regulatoryPlaybooks   RegulatoryPlaybook[]
+
+  @@unique([firmOrganisationId, slug])
+  @@index([firmOrganisationId])
+}
+
+model FirmMatter {
+  id                    String       @id @default(cuid())
+  firmOrganisationId    String
+  clientId              String
+  practiceGroupId       String?
+  matterCode            String?
+  title                 String
+  matterType            FirmMatterType
+  status                FirmMatterStatus @default(OPEN)
+  sensitivity           ConfidentialityLevel @default(CONFIDENTIAL)
+  accessPolicy          AccessPolicy @default(MATTER_TEAM)
+  relationshipPartnerName String
+  responsibleAssociateName String
+  jurisdictionTags      String[]     @default([])
+  regulationFamilies    String[]     @default([])
+  activities            String[]     @default([])
+  licenceTypes          String[]     @default([])
+  topicPaths            String[]     @default([])
+  openedAt              DateTime     @default(now())
+  closedAt              DateTime?
+  notes                 String?      @db.Text
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  firmOrganisation      Organisation @relation("FirmMatterOrganisation", fields: [firmOrganisationId], references: [id], onDelete: Cascade)
+  client                LawFirmClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  practiceGroup         PracticeGroup? @relation(fields: [practiceGroupId], references: [id], onDelete: SetNull)
+  publications          MatterPublication[]
+  clientBriefs          ClientBrief[]
+  knowledgeAssets       KnowledgeAsset[]
+  ethicalWalls          EthicalWall[]
+  commercialOpportunities CommercialOpportunity[]
+
+  @@unique([firmOrganisationId, matterCode])
+  @@index([firmOrganisationId, status])
+  @@index([clientId])
+  @@index([practiceGroupId])
+}
+
+model MatterPublication {
+  id                    String       @id @default(cuid())
+  matterId              String
+  publicationId         String
+  relevanceScore        Float
+  relevanceBucket       ImpactBucket
+  rationale             String       @db.Text
+  suggestedAction       String       @db.Text
+  status                MatterSignalStatus @default(NEW)
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  matter                FirmMatter   @relation(fields: [matterId], references: [id], onDelete: Cascade)
+  publication           Publication  @relation(fields: [publicationId], references: [id], onDelete: Cascade)
+
+  @@unique([matterId, publicationId])
+  @@index([publicationId, relevanceBucket])
+  @@index([matterId, status])
+}
+
+model ClientBrief {
+  id                    String       @id @default(cuid())
+  firmOrganisationId    String
+  matterId              String
+  publicationId         String?
+  status                ClientBriefStatus @default(DRAFT)
+  title                 String
+  audience              String
+  disclaimerProfile     String       @default("internal_review")
+  body                  String       @db.Text
+  sourceProvenanceJson  Json
+  reviewerName          String?
+  approvedById          String?
+  approvedAt            DateTime?
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  firmOrganisation      Organisation @relation("FirmClientBriefs", fields: [firmOrganisationId], references: [id], onDelete: Cascade)
+  matter                FirmMatter   @relation(fields: [matterId], references: [id], onDelete: Cascade)
+  publication           Publication? @relation(fields: [publicationId], references: [id], onDelete: SetNull)
+
+  @@index([firmOrganisationId, status])
+  @@index([matterId, status])
+  @@index([publicationId])
+}
+
+model KnowledgeAsset {
+  id                    String       @id @default(cuid())
+  firmOrganisationId    String
+  matterId              String?
+  publicationId         String?
+  kind                  KnowledgeAssetKind
+  status                KnowledgeAssetStatus @default(DRAFT)
+  visibility            AccessPolicy @default(FIRM_INTERNAL)
+  title                 String
+  summary               String       @db.Text
+  body                  String?      @db.Text
+  regulationFamilies    String[]     @default([])
+  activities            String[]     @default([])
+  licenceTypes          String[]     @default([])
+  topicPaths            String[]     @default([])
+  jurisdictions         String[]     @default([])
+  sourceProvenanceJson  Json?
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  firmOrganisation      Organisation @relation("FirmKnowledgeAssets", fields: [firmOrganisationId], references: [id], onDelete: Cascade)
+  matter                FirmMatter?  @relation(fields: [matterId], references: [id], onDelete: SetNull)
+  publication           Publication? @relation(fields: [publicationId], references: [id], onDelete: SetNull)
+
+  @@index([firmOrganisationId, kind])
+  @@index([matterId])
+  @@index([publicationId])
+}
+
+model RegulatoryPlaybook {
+  id                    String       @id @default(cuid())
+  firmOrganisationId    String
+  practiceGroupId       String?
+  firmProfile           FirmProfile
+  name                  String
+  description           String       @db.Text
+  triggerRegulationFamilies String[] @default([])
+  triggerTopics         String[]     @default([])
+  triggerLicenceTypes   String[]     @default([])
+  workflowSteps         String[]     @default([])
+  outputTemplates       String[]     @default([])
+  isActive              Boolean      @default(true)
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  firmOrganisation      Organisation @relation("FirmPlaybooks", fields: [firmOrganisationId], references: [id], onDelete: Cascade)
+  practiceGroup         PracticeGroup? @relation(fields: [practiceGroupId], references: [id], onDelete: SetNull)
+
+  @@index([firmOrganisationId, firmProfile])
+  @@index([practiceGroupId])
+}
+
+model EthicalWall {
+  id                    String       @id @default(cuid())
+  matterId              String
+  name                  String
+  accessPolicy          AccessPolicy @default(RESTRICTED)
+  allowedUserIds        String[]     @default([])
+  restrictedUserIds     String[]     @default([])
+  notes                 String?      @db.Text
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  matter                FirmMatter   @relation(fields: [matterId], references: [id], onDelete: Cascade)
+
+  @@index([matterId])
+}
+
+model CommercialOpportunity {
+  id                    String       @id @default(cuid())
+  firmOrganisationId    String
+  clientId              String?
+  matterId              String?
+  publicationId         String?
+  serviceOfferingId     String?
+  stage                 OpportunityStage @default(IDENTIFIED)
+  title                 String
+  rationale             String       @db.Text
+  nextAction            String       @db.Text
+  ownerName             String
+  estimatedValueEur     Decimal?     @db.Decimal(12, 2)
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  firmOrganisation      Organisation @relation("FirmOpportunities", fields: [firmOrganisationId], references: [id], onDelete: Cascade)
+  client                LawFirmClient? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  matter                FirmMatter?  @relation(fields: [matterId], references: [id], onDelete: SetNull)
+  publication           Publication? @relation(fields: [publicationId], references: [id], onDelete: SetNull)
+  serviceOffering       ServiceOffering? @relation(fields: [serviceOfferingId], references: [id], onDelete: SetNull)
+
+  @@index([firmOrganisationId, stage])
+  @@index([clientId])
+  @@index([matterId])
+  @@index([publicationId])
+}
+
+enum FirmMatterType {
+  REGULATORY_ADVISORY
+  AUTHORISATION
+  TRANSACTION_DILIGENCE
+  FUND_STRUCTURING
+  DISPUTE
+  IMPLEMENTATION
+  OUTSOURCING
+}
+
+enum FirmMatterStatus {
+  OPEN
+  MONITORING
+  PAUSED
+  CLOSED
+}
+
+enum ConfidentialityLevel {
+  STANDARD
+  CONFIDENTIAL
+  HIGHLY_CONFIDENTIAL
+  PRIVILEGED
+}
+
+enum AccessPolicy {
+  FIRM_INTERNAL
+  MATTER_TEAM
+  CLIENT_VISIBLE
+  RESTRICTED
+}
+
+enum MatterSignalStatus {
+  NEW
+  TRIAGED
+  BRIEF_DRAFTED
+  CLIENT_READY
+  ARCHIVED
+}
+
+enum ClientBriefStatus {
+  DRAFT
+  SENIOR_REVIEW
+  PARTNER_REVIEW
+  CLIENT_READY
+  ARCHIVED
+}
+
+enum KnowledgeAssetKind {
+  PRECEDENT
+  CHECKLIST
+  PLAYBOOK
+  CLIENT_MEMO
+  DILIGENCE_INSERT
+  BOARD_NOTE
+  AUTHORITY_DIALOGUE_NOTE
+}
+
+enum KnowledgeAssetStatus {
+  DRAFT
+  APPROVED
+  ARCHIVED
+}
+
+enum FirmProfile {
+  GLOBAL_ELITE
+  TECH_BOUTIQUE
+  FINTECH_SPECIALIST
+}
+
+enum OpportunityStage {
+  IDENTIFIED
+  REVIEWING
+  PROPOSED
+  WON
+  LOST
+  ARCHIVED
+}
+
 model IntegrationConfig {
   id             String       @id @default(cuid())
   organisationId String?
@@ -806,6 +1134,153 @@ enum IntegrationStatus {
   ENABLED
   DISABLED
   MISCONFIGURED
+}
+
+// ---------------------------------------------------------------------------
+// Agents
+// ---------------------------------------------------------------------------
+
+model AgentDefinition {
+  id                String       @id
+  kind              AgentKind    @unique
+  name              String
+  description       String       @db.Text
+  version           String
+  enabled           Boolean      @default(true)
+  schedule          String?
+  capabilities      String[]     @default([])
+  llmPolicy         AgentLlmPolicy @default(NONE)
+  maxRuntimeSeconds Int          @default(60)
+  maxCostCents      Int          @default(0)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  permissions       AgentToolPermission[]
+  runs              AgentRun[]
+}
+
+model AgentToolPermission {
+  id                String       @id @default(cuid())
+  agentDefinitionId String
+  capability        String
+  isEnabled         Boolean      @default(true)
+  createdAt         DateTime     @default(now())
+
+  agentDefinition   AgentDefinition @relation(fields: [agentDefinitionId], references: [id], onDelete: Cascade)
+
+  @@unique([agentDefinitionId, capability])
+  @@index([capability, isEnabled])
+}
+
+model AgentRun {
+  id                String       @id @default(cuid())
+  agentDefinitionId String?
+  kind              AgentKind
+  status            AgentRunStatus @default(QUEUED)
+  organisationId    String?
+  triggeredByUserId String?
+  trigger           String
+  agentVersion      String
+  inputHash         String
+  outputHash        String?
+  model             String?
+  promptVersion     String?
+  costCents         Int?
+  startedAt         DateTime     @default(now())
+  finishedAt        DateTime?
+  errorMessage      String?      @db.Text
+
+  definition        AgentDefinition? @relation(fields: [agentDefinitionId], references: [id], onDelete: SetNull)
+  steps             AgentRunStep[]
+  artifacts         AgentArtifact[]
+
+  @@index([kind, startedAt])
+  @@index([organisationId, startedAt])
+  @@index([status, startedAt])
+}
+
+model AgentRunStep {
+  id                String       @id @default(cuid())
+  agentRunId        String
+  stepKey           String
+  status            AgentRunStatus @default(RUNNING)
+  inputJson         Json
+  outputJson        Json?
+  errorMessage      String?      @db.Text
+  startedAt         DateTime     @default(now())
+  finishedAt        DateTime?
+
+  agentRun          AgentRun     @relation(fields: [agentRunId], references: [id], onDelete: Cascade)
+
+  @@index([agentRunId, startedAt])
+}
+
+model AgentArtifact {
+  id                String       @id @default(cuid())
+  agentRunId        String
+  organisationId    String?
+  publicationId     String?
+  productMapId      String?
+  type              AgentArtifactType
+  status            AgentArtifactStatus @default(DRAFT)
+  title             String
+  summary           String       @db.Text
+  payloadJson       Json
+  provenanceJson    Json
+  createdAt         DateTime     @default(now())
+  reviewedAt        DateTime?
+  reviewedById      String?
+
+  agentRun          AgentRun     @relation(fields: [agentRunId], references: [id], onDelete: Cascade)
+
+  @@index([organisationId, status])
+  @@index([publicationId, type])
+  @@index([type, status])
+  @@index([createdAt])
+}
+
+enum AgentKind {
+  SOURCE_MONITOR
+  REVIEW_QA
+  BRIEFING
+  CLASSIFICATION_TRIAGE
+  DIFF_EXPLAINER
+  IMPACT_EXPLANATION
+  ALERT_DRAFT
+  SERVICE_ROUTING
+  AUDIT_QA
+}
+
+enum AgentRunStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+  BLOCKED_BY_POLICY
+}
+
+enum AgentArtifactType {
+  FINDING
+  REVIEW_SUGGESTION
+  BRIEFING_DRAFT
+  ALERT_DRAFT
+  SERVICE_RULE_SUGGESTION
+  SOURCE_DILIGENCE_NOTE
+  IMPACT_EXPLANATION
+}
+
+enum AgentArtifactStatus {
+  DRAFT
+  APPROVED
+  DISMISSED
+  APPLIED
+}
+
+enum AgentLlmPolicy {
+  NONE
+  PUBLICATION_ONLY
+  REDACTED_LOCAL_FACTS
 }
 
 model AuditLog {
