@@ -85,7 +85,7 @@ Review decisions, service catalogue governance, source diligence edits, and manu
 
 ## Safety Defaults
 
-- Email, Slack, Teams, and HubSpot delivery remain blocked until a human approves an alert draft and presses the reviewed send action.
+- Email, Slack and Teams delivery remain blocked until a human approves an alert draft and presses the reviewed send action.
 - Alert sends atomically claim an approved draft, preventing duplicate delivery attempts from concurrent clicks.
 - Reviewer attribution for persisted decisions and approvals is taken from the authenticated operator identity.
 - Configured Postgres reads fail visibly on error and never substitute sample client records.
@@ -94,28 +94,29 @@ Review decisions, service catalogue governance, source diligence edits, and manu
 - Agents are disabled by default in production through `HORIZON_AGENTS_ENABLED`, scheduled autorun is disabled unless `HORIZON_AGENT_AUTORUN_ENABLED="true"`, and agent LLM calls require `HORIZON_AGENT_LLM_ENABLED="true"`.
 - Agent LLM use is publication-only in this pass. Product-map and client facts are either kept local or redacted before any future local-fact policy is introduced.
 - Agent artifacts are drafts or findings. Approved alert-draft artifacts can be applied only as in-app draft alerts. Existing alert approval and explicit-send actions remain the only route to external delivery.
-- Law-firm brief drafts remain internal until reviewed into `CLIENT_READY`; the law-firm screens have no external-send action.
-- Matter taxonomy, client names, ethical-wall metadata, and commercial opportunity records stay local and are not sent to AI providers.
 - Reviewer-triggered classification reruns return the publication to pending review and retire related pending alert drafts.
 - Product-map impact scoring is deterministic and local in this pass.
 - Product-map edits are organisation-scoped, audit logged, and immediately recalculate the persisted explanation breakdown.
 - Alert generation and reviewed send require current quarterly confirmation for every active product map in the organisation.
 - Live polling honours source reuse status and allowed cadence; sources awaiting diligence remain blocked.
 - Production mode denies an unconfigured authenticated app. Read-only demo rendering is available only when explicitly permitted with `HORIZON_ALLOW_DEMO_MODE="true"` and no database is configured.
-- External publishing, outreach, billing, Neo4j, and fine-tuning remain out of scope for this pilot-ready core.
+- External publishing, billing, Neo4j and fine-tuning remain out of scope for this pilot-ready core.
 
+## System Disclaimers & Regulatory Compliance
 
-## ⚠️ System Disclaimers & Regulatory Compliance
+### 1. Controlled AI Architecture
 
-### 1. Decoupled AI Architecture
-This system is structured as an autonomous multi-agent pipeline using Large Language Models (LLMs) to automate processing, information retrieval, and synthesis. It functions via a decoupled architecture consisting of specialized agent personas (e.g., scoring, profiling, outreach drafts, translation) communicating asynchronously.
+This system is structured as a controlled regulatory-intelligence workflow. Deterministic classification, scoring and review routing are the default. LLM use is optional, configuration-gated and limited to public regulator publication text in this pilot-ready core.
 
-### 2. Operational Limits & Hallucinations
-- **Accuracy Constraints**: Output generation is subject to LLM limitations. This includes potential hallucinations, logical inconsistencies, and processing lag.
-- **Data Latency**: Vector store updates and local database states are updated periodically and do not reflect real-time regulatory or institutional shifts.
+### 2. Operational Limits
+
+- **Accuracy Constraints**: Output generation and classification may be incomplete, stale or incorrect and require reviewer validation.
+- **Data Latency**: Source ingestion and local database states are updated periodically and do not reflect real-time regulatory or institutional shifts.
 
 ### 3. Mandatory Human-in-the-Loop Review
-**CRITICAL**: Under no circumstances should any raw output (including client profiles, generated LinkedIn posts, email sequences, or automated outreach drafts) be sent, published, or finalized without thorough human validation. The operator retains sole responsibility for reviewing and verifying the accuracy and appropriateness of all generated artifacts.
+
+**CRITICAL**: Under no circumstances should any raw output, regulatory summary, alert draft or operational recommendation be sent, published, finalized or relied on without thorough human validation. The operator retains sole responsibility for reviewing and verifying the accuracy and appropriateness of all generated artifacts.
 
 ### 4. No Legal Advice Framing
-**This software does not provide legal representation or binding legal counsel.** All synthesized analyses, regulatory scans, contract clause comparisons, and case triage scores are for administrative automation and operational assistance only. This tool is not a licensed attorney, does not operate as a law firm, and does not establish any attorney-client relationship. Operators must consult qualified legal professionals for binding advice or representation.
+
+**This software does not provide legal representation or binding legal counsel.** All synthesized analyses, regulatory scans and case triage scores are for administrative automation and operational assistance only. This tool is not a licensed attorney, does not operate as a law firm, and does not establish any attorney-client relationship. Operators must consult qualified legal professionals for binding advice or representation.
