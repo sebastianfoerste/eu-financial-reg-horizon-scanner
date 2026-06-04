@@ -67,12 +67,59 @@ Review decisions, service catalogue governance, source diligence edits, and manu
 - `/ingestion` manual source polling and Inngest dry-run diagnostics
 - `/settings` integration and organisation controls
 
+## Relationship to Regulatory Compliance OS
+
+This repository is the standalone proof product for the scanner module inside `Regulatory Compliance OS`.
+
+The consolidated parent app mounts the scanner under `/scanner` and keeps the same domain boundaries:
+
+- `src/lib/scanner`: taxonomy loading, scoring, source diligence, review, delivery, runtime hardening, and agent helpers.
+- `src/app/scanner`: operator workspaces for review, alerts, sources, product maps, law-firm mode, and briefing.
+- `tests/scanner`: ported domain and API tests that protect the consolidated module.
+
+The standalone repository remains useful because it is smaller, easier to review, and focused on one regulatory-intelligence workflow. The parent app uses the same discipline at a broader product level: deterministic classification and scoring first, optional public-text AI only after explicit configuration, and reviewed delivery gates for every external alert.
+
+## Proof and Validation
+
+The current proof bundle for a fresh local checkout is:
+
+```bash
+npm run prisma:generate
+npm run typecheck
+npm run test
+npm run lint
+npm run ingest:fixture
+npm run build
+npm audit --omit=dev
+```
+
+On 4 June 2026, this bundle produced:
+
+- `npm run typecheck`: passed.
+- `npm run test`: 95 tests passed.
+- `npm run lint`: passed.
+- `npm run ingest:fixture`: dry-run mode with one publication.
+- `npm run build`: passed and rendered the scanner route surface.
+- `npm audit --omit=dev`: zero vulnerabilities.
+
+The route smoke check requires a running dev server:
+
+```bash
+npm run dev
+npm run smoke:routes
+```
+
+Reviewers should treat those results as proof of current repository health only. Regulatory completeness requires separate legal review.
+
 ## Safety Principles
 
 - Public sources only.
 - Deterministic classification first.
 - Explicit configuration before AI use.
 - Human review before delivery.
+- No alert reaches an external channel without a reviewer approving it.
+- Product-map impact scoring is deterministic and local.
+- AI Gateway use is limited to public regulator publication text after explicit configuration.
 - Tenant-scoped access when auth is configured.
 - Synthetic demo data only.
 
