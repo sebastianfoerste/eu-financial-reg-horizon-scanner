@@ -15,7 +15,9 @@
     "prisma:migrate": "DATABASE_URL=${DATABASE_URL:-postgresql://horizon:horizon@localhost:5438/horizon_scanner?schema=public} prisma migrate dev",
     "prisma:seed": "DATABASE_URL=${DATABASE_URL:-postgresql://horizon:horizon@localhost:5438/horizon_scanner?schema=public} prisma db seed",
     "ingest:fixture": "tsx scripts/ingest-fixtures.ts",
-    "smoke:routes": "tsx scripts/smoke-routes.ts"
+    "digest:dry-run": "tsx scripts/dry-run-digest.ts",
+    "smoke:routes": "tsx scripts/smoke-routes.ts",
+    "check:fast": "npm run lint && npm run typecheck && npm run test && npm run prisma:validate"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.4.1",
@@ -56,6 +58,9 @@
     "vitest": "^4.1.6"
   },
   "overrides": {
+    "@opentelemetry/core": "2.8.0",
+    "@grpc/grpc-js": "^1.14.4",
+    "protobufjs": "^7.6.4",
     "postcss": "^8.5.10"
   }
 }

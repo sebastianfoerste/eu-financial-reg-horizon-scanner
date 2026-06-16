@@ -12,3 +12,5 @@ This version has breaking changes. APIs, conventions, and file structure may all
 - Product-map impact scoring is deterministic and versioned in `config/scoring-rules.yaml`.
 - Email, Slack, Teams, HubSpot, publishing, and outreach paths must stay draft-only unless a reviewed action explicitly sends them.
 - Prefer fixture-backed ingestion tests before changing live adapter parsing.
+- Agentic work is default-deny. Agents may draft findings, classifications and alert previews, but they may not send messages, approve review items, mutate product maps, change source status or bypass alert proof packets.
+- Demo publications and product maps must stay synthetic or public-source only.

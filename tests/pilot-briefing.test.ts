@@ -63,6 +63,7 @@ function alert(partial: Partial<AlertView> = {}): AlertView {
       serviceOfferingIds: mockPublications[0].serviceOfferingIds,
     },
     deliveryAttempts: [],
+    proofPackets: [],
     ...partial,
   };
 }
@@ -112,7 +113,14 @@ describe("pilot briefing", () => {
       generatedAt: new Date("2026-05-28T08:00:00.000Z"),
     });
 
-    expect(briefing.riskQueue.map((item) => item.impactScore)).toEqual([82, 64]);
+    expect(briefing.riskQueue.map((item) => item.impactScore)).toEqual([82, 76, 64, 61, 58]);
+    expect(briefing.riskQueue.map((item) => item.publicationId)).toEqual([
+      "pub-esma-qa-2845",
+      "pub-eba-psd3-fraud",
+      "pub-eba-dora-jc",
+      "pub-ecb-prudential-srep",
+      "pub-commission-ai-act-gpai",
+    ]);
     expect(briefing.metrics.serviceOfferings).toBeGreaterThan(0);
     expect(briefing.metrics.criticalProductLines).toBe(1);
   });

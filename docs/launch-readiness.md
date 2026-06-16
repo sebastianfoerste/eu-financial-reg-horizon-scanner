@@ -63,10 +63,18 @@ npm run typecheck
 npm run test
 npm run prisma:validate
 npm run ingest:fixture
-npm run smoke:routes
 npm run build
 npm audit --omit=dev
 ```
+
+With the app running, add the browser-route smoke:
+
+```bash
+npm run dev
+npm run smoke:routes
+```
+
+Use `SMOKE_BASE_URL` or `npm run smoke:routes -- --base-url=http://host:port` when the app is not running on `http://localhost:3000`.
 
 ## Sample data rule
 

@@ -589,6 +589,7 @@ model Alert {
   publication    Publication  @relation(fields: [publicationId], references: [id], onDelete: Cascade)
   reads          AlertRead[]
   deliveryAttempts DeliveryAttempt[]
+  proofPackets   AlertProofPacket[]
 
   @@index([organisationId, status])
   @@index([scheduledFor])
@@ -642,6 +643,27 @@ model DeliveryAttempt {
 
   @@index([alertId, attemptedAt])
   @@index([provider, status])
+}
+
+model AlertProofPacket {
+  id                 String   @id @default(cuid())
+  alertId            String
+  sourceAuthority    String
+  sourceReviewState  String
+  reviewerState      String
+  recipientState     String
+  httpsSourceCheck   Boolean
+  payloadDigest      String
+  gateStatus         String
+  reasons            String[]
+  packetJson         Json
+  createdAt          DateTime @default(now())
+
+  alert              Alert    @relation(fields: [alertId], references: [id], onDelete: Cascade)
+
+  @@index([alertId, createdAt])
+  @@index([gateStatus, createdAt])
+  @@index([sourceReviewState])
 }
 
 enum DeliveryAttemptStatus {

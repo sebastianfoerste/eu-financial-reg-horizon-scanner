@@ -1,5 +1,12 @@
 import type { AlertChannel, AlertStatus, Prisma } from "@prisma/client";
 
+import {
+  alertProofPacketInputFromRecord,
+  alertProofPacketPersistence,
+  buildAlertProofPacket,
+  summarizeAlertProofPacket,
+  type AlertProofPacketInput,
+} from "@/lib/alert-proof-packet";
 import { writeAuditLog } from "@/lib/audit";
 import { assertOrganisationAccess, getReviewerName, requireOperator } from "@/lib/authz";
 import { deliverApprovedAlert, getDeliveryGovernanceBlock, providerForChannel } from "@/lib/delivery";
@@ -56,6 +63,18 @@ export type AlertView = {
     status: string;
     attemptedAt: string;
     errorMessage: string | null;
+  }>;
+  proofPackets: Array<{
+    id: string;
+    createdAt: string;
+    sourceAuthority: string;
+    sourceReviewState: string;
+    reviewerState: string;
+    recipientState: string;
+    httpsSourceCheck: boolean;
+    gateStatus: string;
+    payloadDigest: string;
+    reasons: string[];
   }>;
 };
 
@@ -183,6 +202,7 @@ export async function listAlerts(organisationId?: string): Promise<AlertView[]> 
         to: null,
       },
       deliveryAttempts: [],
+      proofPackets: [],
     }));
   }
 
@@ -198,6 +218,10 @@ export async function listAlerts(organisationId?: string): Promise<AlertView[]> 
       },
       deliveryAttempts: {
         orderBy: { attemptedAt: "desc" },
+        take: 5,
+      },
+      proofPackets: {
+        orderBy: { createdAt: "desc" },
         take: 5,
       },
     },
@@ -224,6 +248,18 @@ export async function listAlerts(organisationId?: string): Promise<AlertView[]> 
       status: attempt.status,
       attemptedAt: attempt.attemptedAt.toISOString(),
       errorMessage: attempt.errorMessage,
+    })),
+    proofPackets: alert.proofPackets.map((packet) => ({
+      id: packet.id,
+      createdAt: packet.createdAt.toISOString(),
+      sourceAuthority: packet.sourceAuthority,
+      sourceReviewState: packet.sourceReviewState,
+      reviewerState: packet.reviewerState,
+      recipientState: packet.recipientState,
+      httpsSourceCheck: packet.httpsSourceCheck,
+      gateStatus: packet.gateStatus,
+      payloadDigest: packet.payloadDigest,
+      reasons: packet.reasons,
     })),
   }));
 }
@@ -412,7 +448,37 @@ export async function approveAlert(input: { alertId: string; reviewerName: strin
       approvedById: operator.userId,
       approvedByName: reviewerName,
     },
+    include: {
+      publication: {
+        include: {
+          source: {
+            include: {
+              diligenceRecords: {
+                orderBy: { updatedAt: "desc" },
+                take: 1,
+              },
+            },
+          },
+        },
+      },
+    },
   });
+  const payload = asAlertPayload(alert.payloadJson);
+  const proofPacket = await persistAlertProofPacket(
+    prisma,
+    alertProofPacketInputFromRecord({
+      id: alert.id,
+      publication: alert.publication,
+      channel: alert.channel,
+      approvedAt: alert.approvedAt,
+      approvedByName: alert.approvedByName,
+      payload: {
+        subject: payload.subject,
+        text: payload.text,
+        to: payload.to,
+      },
+    }),
+  );
 
   await writeAuditLog({
     action: "alert.approve",
@@ -420,7 +486,7 @@ export async function approveAlert(input: { alertId: string; reviewerName: strin
     entityId: input.alertId,
     organisationId: alert.organisationId,
     actorUserId: operator.userId,
-    payloadJson: { reviewerName },
+    payloadJson: { reviewerName, proofPacket: summarizeAlertProofPacket(proofPacket) },
   });
 
   return { ok: true, mode: "database" as const, alert };
@@ -443,11 +509,28 @@ export async function sendApprovedAlert(input: { alertId: string }) {
   }
 
   const prisma = getPrisma();
-  const alert = await prisma.alert.findUniqueOrThrow({ where: { id: input.alertId } });
+  const alert = await prisma.alert.findUniqueOrThrow({
+    where: { id: input.alertId },
+    include: {
+      publication: {
+        include: {
+          source: {
+            include: {
+              diligenceRecords: {
+                orderBy: { updatedAt: "desc" },
+                take: 1,
+              },
+            },
+          },
+        },
+      },
+    },
+  });
   assertOrganisationAccess(operator, alert.organisationId);
   if (alert.status !== "APPROVED") {
     throw new Error("Only approved alert drafts can be sent.");
   }
+  const payload = asAlertPayload(alert.payloadJson);
   const readiness = await getProductMapDeliveryReadiness(alert.organisationId);
   if (!readiness.ready) {
     const errorMessage = "Product-map confirmation is due. Confirm the footprint and generate a new reviewed alert draft.";
@@ -466,6 +549,38 @@ export async function sendApprovedAlert(input: { alertId: string }) {
     return { ok: false, mode: "database" as const, status: "SKIPPED" as const };
   }
 
+  const proofPacket = await persistAlertProofPacket(
+    prisma,
+    alertProofPacketInputFromRecord({
+      id: alert.id,
+      publication: alert.publication,
+      channel: alert.channel,
+      approvedAt: alert.approvedAt,
+      approvedByName: alert.approvedByName,
+      payload: {
+        subject: payload.subject,
+        text: payload.text,
+        to: payload.to,
+      },
+    }),
+  );
+  if (!proofPacket.externalSendAllowed) {
+    const errorMessage = `Alert proof packet blocked external delivery: ${proofPacket.reviewGate.reasons.join(" ")}`;
+    await prisma.alert.update({
+      where: { id: alert.id },
+      data: { status: "SKIPPED", errorMessage },
+    });
+    await writeAuditLog({
+      action: "alert.send.blocked",
+      entityType: "alert",
+      entityId: alert.id,
+      organisationId: alert.organisationId,
+      actorUserId: operator.userId,
+      payloadJson: { proofPacket: summarizeAlertProofPacket(proofPacket) },
+    });
+    return { ok: false, mode: "database" as const, status: "SKIPPED" as const };
+  }
+
   const sendClaim = await prisma.alert.updateMany({
     where: { id: alert.id, status: "APPROVED" },
     data: { status: "SENDING", errorMessage: null },
@@ -474,7 +589,6 @@ export async function sendApprovedAlert(input: { alertId: string }) {
     throw new Error("This alert has already been claimed for delivery.");
   }
 
-  const payload = asAlertPayload(alert.payloadJson);
   const governanceBlock = await getDeliveryGovernanceBlock(alert.channel, alert.organisationId);
   const result =
     governanceBlock ??
@@ -514,8 +628,33 @@ export async function sendApprovedAlert(input: { alertId: string }) {
     entityId: alert.id,
     organisationId: alert.organisationId,
     actorUserId: operator.userId,
-    payloadJson: { provider: result.provider, status: result.status, errorMessage: result.errorMessage },
+    payloadJson: {
+      provider: result.provider,
+      status: result.status,
+      errorMessage: result.errorMessage,
+      proofPacket: summarizeAlertProofPacket(proofPacket),
+    },
   });
 
   return { ok: nextStatus === "SENT", mode: "database" as const, status: nextStatus };
+}
+
+async function persistAlertProofPacket(prisma: ReturnType<typeof getPrisma>, input: AlertProofPacketInput) {
+  const packet = await buildAlertProofPacket(input);
+  const persistence = alertProofPacketPersistence(packet);
+  await prisma.alertProofPacket.create({
+    data: {
+      alertId: packet.alertId,
+      sourceAuthority: persistence.sourceAuthority,
+      sourceReviewState: persistence.sourceReviewState,
+      reviewerState: persistence.reviewerState,
+      recipientState: persistence.recipientState,
+      httpsSourceCheck: persistence.httpsSourceCheck,
+      payloadDigest: persistence.payloadDigest,
+      gateStatus: persistence.gateStatus,
+      reasons: persistence.reasons,
+      packetJson: persistence.packetJson as Prisma.InputJsonValue,
+    },
+  });
+  return packet;
 }

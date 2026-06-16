@@ -61,6 +61,13 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
                   Source diligence
                 </Link>
               ) : null}
+              <Link
+                href="/sources/currency"
+                className="inline-flex h-10 w-fit items-center gap-2 rounded-md border border-zinc-300 bg-white px-4 text-sm font-semibold text-zinc-900 hover:bg-zinc-50"
+              >
+                <Clock className="h-4 w-4" aria-hidden="true" />
+                Currency queue
+              </Link>
             </div>
           </div>
         </section>

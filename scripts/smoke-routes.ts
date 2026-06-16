@@ -1,14 +1,23 @@
+import { pathToFileURL } from "node:url";
+
 type SmokeRoute = {
   path: string;
   expected: string[];
 };
 
-const baseUrl =
+type SmokeResult = {
+  path: string;
+  status: number;
+  ok: boolean;
+  missing: string[];
+};
+
+export const baseUrl =
   process.argv.find((argument) => argument.startsWith("--base-url="))?.replace("--base-url=", "") ??
   process.env.SMOKE_BASE_URL ??
   "http://localhost:3000";
 
-const routes: SmokeRoute[] = [
+export const routes: SmokeRoute[] = [
   { path: "/briefing", expected: ["pilot briefing room", "impact queue"] },
   { path: "/", expected: ["scanner cockpit", "agent handoff", "save current view"] },
   { path: "/law-firm", expected: ["law firm workbench", "detailed implementation plan", "priority matter board"] },
@@ -29,22 +38,56 @@ const routes: SmokeRoute[] = [
   { path: "/sign-up", expected: ["clerk is not configured locally"] },
 ];
 
-async function checkRoute(route: SmokeRoute) {
-  const url = new URL(route.path, baseUrl);
-  const response = await fetch(url);
-  const text = (await response.text()).toLowerCase();
-  const missing = route.expected.filter((expected) => !text.includes(expected));
+export function describeSmokeError(error: unknown): string {
+  if (error instanceof AggregateError && error.errors.length > 0) {
+    return error.errors.map(describeSmokeError).join("; ");
+  }
 
-  return {
-    path: route.path,
-    status: response.status,
-    ok: response.ok && missing.length === 0,
-    missing,
-  };
+  if (error instanceof Error && error.message.trim()) {
+    const cause = "cause" in error ? error.cause : undefined;
+    const causeText = cause ? describeSmokeError(cause) : "";
+    return causeText ? `${error.message}: ${causeText}` : error.message;
+  }
+
+  if (typeof error === "object" && error !== null) {
+    const record = error as Record<string, unknown>;
+    const code = typeof record.code === "string" ? record.code : "";
+    const syscall = typeof record.syscall === "string" ? record.syscall : "";
+    const address = typeof record.address === "string" ? record.address : "";
+    const port = typeof record.port === "number" ? String(record.port) : "";
+    const target = address && port ? `${address}:${port}` : address || port;
+    const parts = [code, syscall, target].filter(Boolean);
+    if (parts.length > 0) return parts.join(" ");
+  }
+
+  return String(error || "unknown route smoke error");
+}
+
+export async function checkRoute(route: SmokeRoute, fetchImpl: typeof fetch = fetch): Promise<SmokeResult> {
+  const url = new URL(route.path, baseUrl);
+  try {
+    const response = await fetchImpl(url);
+    const text = (await response.text()).toLowerCase();
+    const missing = route.expected.filter((expected) => !text.includes(expected));
+
+    return {
+      path: route.path,
+      status: response.status,
+      ok: response.ok && missing.length === 0,
+      missing,
+    };
+  } catch (error) {
+    return {
+      path: route.path,
+      status: 0,
+      ok: false,
+      missing: [`request failed: ${describeSmokeError(error)}`],
+    };
+  }
 }
 
 async function main() {
-  const results = await Promise.all(routes.map(checkRoute));
+  const results = await Promise.all(routes.map((route) => checkRoute(route)));
   const failed = results.filter((result) => !result.ok);
 
   for (const result of results) {
@@ -56,8 +99,15 @@ async function main() {
   }
 
   if (failed.length) {
+    if (failed.length === results.length && results.every((result) => result.status === 0)) {
+      console.error(
+        `Route smoke could not reach ${baseUrl}. Start the app with \`npm run dev\` or pass --base-url=http://host:port.`,
+      );
+    }
     process.exitCode = 1;
   }
 }
 
-void main();
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  void main();
+}

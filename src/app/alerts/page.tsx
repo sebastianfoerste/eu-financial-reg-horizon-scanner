@@ -184,6 +184,33 @@ export default async function AlertsPage({ searchParams }: AlertsPageProps) {
                       ))}
                     </div>
                   ) : null}
+                  {alert.proofPackets.length ? (
+                    <div className="mt-3 rounded-md border border-zinc-200 bg-zinc-50 p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs font-semibold uppercase tracking-normal text-zinc-500">Proof history</p>
+                        <Link href={`/api/alerts/${alert.id}/proof`} className="text-xs font-semibold text-teal-800 hover:text-teal-950">
+                          Open JSON
+                        </Link>
+                      </div>
+                      <div className="mt-2 space-y-2">
+                        {alert.proofPackets.slice(0, 2).map((packet) => (
+                          <div key={packet.id} className="grid gap-2 text-xs text-zinc-600 md:grid-cols-[1fr_auto]">
+                            <div>
+                              <span className="font-semibold text-zinc-800">{packet.gateStatus}</span>
+                              <span> source {packet.sourceReviewState}</span>
+                              <span> reviewer {packet.reviewerState}</span>
+                              <span> recipient {packet.recipientState}</span>
+                              <span> HTTPS {packet.httpsSourceCheck ? "passed" : "failed"}</span>
+                            </div>
+                            <code className="text-teal-800">{packet.payloadDigest.slice(0, 16)}</code>
+                            {packet.reasons.length ? (
+                              <p className="md:col-span-2 text-amber-800">{packet.reasons.join(" ")}</p>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
                 <div className="space-y-3">
                   <StatusBadge bucket={readImpactBucket(alert.payload.impactBucket)} score={alert.payload.impactScore} />

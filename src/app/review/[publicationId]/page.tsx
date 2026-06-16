@@ -9,7 +9,9 @@ import { StatusBadge } from "@/components/status-badge";
 import { listLatestAgentArtifacts } from "@/lib/agents/runner";
 import { requireInternalOperator } from "@/lib/authz";
 import { getReviewItem } from "@/lib/review";
+import { buildRegulatoryActionPacket } from "@/lib/regulatory-action-packet";
 import { summarizeReviewReadiness, type ReviewReadinessStatus } from "@/lib/review-readiness";
+import { listSourceDiligence } from "@/lib/source-diligence";
 import { cn, compactDateTime } from "@/lib/utils";
 
 type ReviewDetailProps = {
@@ -25,12 +27,19 @@ export default async function ReviewDetailPage({ params }: ReviewDetailProps) {
   const item = await getReviewItem(publicationId, organisationId);
   if (!item) notFound();
   const publication = item.publication;
-  const agentArtifacts = await listLatestAgentArtifacts({
-    organisationId,
-    publicationId: publication.id,
-    take: 6,
-  });
+  const [agentArtifacts, diligence] = await Promise.all([
+    listLatestAgentArtifacts({
+      organisationId,
+      publicationId: publication.id,
+      take: 6,
+    }),
+    listSourceDiligence(),
+  ]);
   const readiness = summarizeReviewReadiness(item);
+  const actionPacket = buildRegulatoryActionPacket({
+    reviewItem: item,
+    sourceDiligence: diligence.find((record) => record.sourceCode === publication.sourceCode),
+  });
 
   return (
     <AppShell active="/review">
@@ -155,6 +164,55 @@ export default async function ReviewDetailPage({ params }: ReviewDetailProps) {
                   <ReadinessCheckRow key={check.key} status={check.status} label={check.label} detail={check.detail} />
                 ))}
               </div>
+            </section>
+
+            <section className="rounded-md border border-zinc-200 bg-white p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-sm font-semibold uppercase tracking-normal text-zinc-500">Regulatory action packet</h2>
+                  <p className="mt-2 text-sm leading-6 text-zinc-600">
+                    {actionPacket.review_notice}
+                  </p>
+                </div>
+                <span
+                  className={cn(
+                    "inline-flex h-8 items-center rounded-md border px-2 text-xs font-semibold",
+                    actionPacket.blockers.length
+                      ? "border-red-200 bg-red-50 text-red-800"
+                      : "border-teal-200 bg-teal-50 text-teal-800",
+                  )}
+                >
+                  {actionPacket.blockers.length ? "Blocked" : "Ready"}
+                </span>
+              </div>
+              <dl className="mt-4 space-y-2 text-sm">
+                <div className="flex justify-between gap-3">
+                  <dt className="text-zinc-500">Source</dt>
+                  <dd className="text-right font-medium text-zinc-950">{actionPacket.source_status.authority_level}</dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-zinc-500">Review gate</dt>
+                  <dd className="text-right font-medium text-zinc-950">{actionPacket.review_gate.status}</dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-zinc-500">Alert eligible</dt>
+                  <dd className="text-right font-medium text-zinc-950">{actionPacket.alert_eligibility.eligible ? "Yes" : "No"}</dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-zinc-500">Digest</dt>
+                  <dd className="text-right font-mono text-xs text-teal-800">{actionPacket.digest.slice(0, 16)}</dd>
+                </div>
+              </dl>
+              {item.status === "APPROVED" ? (
+                <Link
+                  href={`/api/review/${publication.id}/action-packet`}
+                  className="mt-4 inline-flex h-9 items-center rounded-md border border-zinc-300 bg-white px-3 text-sm font-semibold text-zinc-900 hover:bg-zinc-50"
+                >
+                  Open packet JSON
+                </Link>
+              ) : (
+                <p className="mt-4 text-xs text-zinc-500">Packet JSON is exposed after approval.</p>
+              )}
             </section>
 
             <ImpactExplanationPanel publication={publication} />
