@@ -5,20 +5,26 @@ import { getEnv } from "@/lib/env";
 import { pollTierOneSources } from "@/lib/ingestion/pipeline";
 import { inngest } from "@/inngest/client";
 
+export const pollTierOneSourcesHandler = async ({ step }: { step: any }) => {
+  const results = await step.run("poll tier one adapters", async () => pollTierOneSources());
+  return {
+    results,
+    failed: results.filter((result: any) => result.status === "FAILED").length,
+  };
+};
+
 export const pollTierOneSourcesFunction = inngest.createFunction(
   {
     id: "poll-tier-one-sources",
     name: "Poll Tier 1 regulator sources",
     triggers: [{ cron: "*/60 * * * *" }],
   },
-  async ({ step }) => {
-    const results = await step.run("poll tier one adapters", async () => pollTierOneSources());
-    return {
-      results,
-      failed: results.filter((result) => result.status === "FAILED").length,
-    };
-  },
+  pollTierOneSourcesHandler,
 );
+
+export const manualPollSourcesHandler = async ({ step }: { step: any }) => {
+  return step.run("poll tier one adapters", async () => pollTierOneSources());
+};
 
 export const manualPollSourcesFunction = inngest.createFunction(
   {
@@ -26,10 +32,12 @@ export const manualPollSourcesFunction = inngest.createFunction(
     name: "Manual source poll",
     triggers: [{ event: "sources/poll.requested" }],
   },
-  async ({ step }) => {
-    return step.run("poll tier one adapters", async () => pollTierOneSources());
-  },
+  manualPollSourcesHandler,
 );
+
+export const prepareDigestPreviewHandler = async ({ step }: { step: any }) => {
+  return step.run("render digest preview", async () => getDigestPreview());
+};
 
 export const prepareDigestPreviewFunction = inngest.createFunction(
   {
@@ -37,10 +45,17 @@ export const prepareDigestPreviewFunction = inngest.createFunction(
     name: "Prepare dry-run digest preview",
     triggers: [{ event: "digest/preview.requested" }, { cron: "0 7 * * 1-5" }],
   },
-  async ({ step }) => {
-    return step.run("render digest preview", async () => getDigestPreview());
-  },
+  prepareDigestPreviewHandler,
 );
+
+export const scheduledSourceMonitorAgentHandler = async ({ step }: { step: any }) => {
+  return step.run("run source monitor agent", async () => {
+    if (!getEnv().HORIZON_AGENT_AUTORUN_ENABLED) {
+      return { skipped: true, reason: "Agent autorun is disabled." };
+    }
+    return runAgent({ kind: "SOURCE_MONITOR", trigger: "inngest" });
+  });
+};
 
 export const scheduledSourceMonitorAgentFunction = inngest.createFunction(
   {
@@ -48,15 +63,31 @@ export const scheduledSourceMonitorAgentFunction = inngest.createFunction(
     name: "Agent source monitor",
     triggers: [{ cron: "*/60 * * * *" }, { event: "agents/source-monitor.requested" }],
   },
-  async ({ step }) => {
-    return step.run("run source monitor agent", async () => {
-      if (!getEnv().HORIZON_AGENT_AUTORUN_ENABLED) {
-        return { skipped: true, reason: "Agent autorun is disabled." };
-      }
-      return runAgent({ kind: "SOURCE_MONITOR", trigger: "inngest" });
-    });
-  },
+  scheduledSourceMonitorAgentHandler,
 );
+
+export const requestedAgentRunHandler = async ({ event, step }: { event: any; step: any }) => {
+  return step.run("run requested agent", async () => {
+    const data = event.data as {
+      kind?: string;
+      organisationId?: string | null;
+      triggeredByUserId?: string | null;
+      publicationId?: string | null;
+      limit?: number;
+    };
+    if (!data.kind || !isAgentKind(data.kind)) {
+      throw new Error("Requested agent run did not include a known agent kind.");
+    }
+    return runAgent({
+      kind: data.kind,
+      trigger: "inngest",
+      organisationId: data.organisationId ?? null,
+      triggeredByUserId: data.triggeredByUserId ?? null,
+      publicationId: data.publicationId ?? null,
+      limit: data.limit,
+    });
+  });
+};
 
 export const requestedAgentRunFunction = inngest.createFunction(
   {
@@ -64,28 +95,7 @@ export const requestedAgentRunFunction = inngest.createFunction(
     name: "Requested agent run",
     triggers: [{ event: "agents/run.requested" }],
   },
-  async ({ event, step }) => {
-    return step.run("run requested agent", async () => {
-      const data = event.data as {
-        kind?: string;
-        organisationId?: string | null;
-        triggeredByUserId?: string | null;
-        publicationId?: string | null;
-        limit?: number;
-      };
-      if (!data.kind || !isAgentKind(data.kind)) {
-        throw new Error("Requested agent run did not include a known agent kind.");
-      }
-      return runAgent({
-        kind: data.kind,
-        trigger: "inngest",
-        organisationId: data.organisationId ?? null,
-        triggeredByUserId: data.triggeredByUserId ?? null,
-        publicationId: data.publicationId ?? null,
-        limit: data.limit,
-      });
-    });
-  },
+  requestedAgentRunHandler,
 );
 
 export const functions = [

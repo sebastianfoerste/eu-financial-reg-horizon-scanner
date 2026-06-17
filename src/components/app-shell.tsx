@@ -46,7 +46,7 @@ export function AppShell({ children, active = "/" }: { children: React.ReactNode
               <span className="block truncate text-sm font-semibold text-zinc-950">
                 EU Financial Reg Horizon Scanner
               </span>
-              <span className="hidden text-xs text-zinc-500 sm:block">MVP foundation</span>
+              <span className="hidden text-xs text-zinc-500 sm:block">Review-gated monitoring cockpit</span>
             </span>
           </Link>
 

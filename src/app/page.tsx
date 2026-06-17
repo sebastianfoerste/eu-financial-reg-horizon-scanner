@@ -90,9 +90,9 @@ async function LoadedHome({ searchParams }: PageProps) {
       <div className="space-y-6">
         <section className="flex flex-col justify-between gap-4 border-b border-zinc-200 pb-6 md:flex-row md:items-end">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-normal text-teal-700">Scanner cockpit</p>
+            <p className="text-sm font-semibold uppercase tracking-normal text-teal-700">Review-gated scanner cockpit</p>
             <h1 className="mt-2 text-3xl font-semibold tracking-normal text-zinc-950">
-              Regulatory publications within the 24-hour window.
+              Regulatory publications that need source-aware review.
             </h1>
           </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -122,8 +122,8 @@ async function LoadedHome({ searchParams }: PageProps) {
         <section className="rounded-md border border-zinc-200 bg-white p-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div>
-              <p className="text-sm font-semibold uppercase tracking-normal text-teal-700">Action queue</p>
-              <h2 className="mt-1 text-lg font-semibold text-zinc-950">What needs attention first</h2>
+              <p className="text-sm font-semibold uppercase tracking-normal text-teal-700">Review queue</p>
+              <h2 className="mt-1 text-lg font-semibold text-zinc-950">What must be checked before delivery</h2>
             </div>
             <Link
               href="/review"
@@ -158,7 +158,7 @@ async function LoadedHome({ searchParams }: PageProps) {
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div>
               <p className="text-sm font-semibold uppercase tracking-normal text-teal-700">Agent handoff</p>
-              <h2 className="mt-1 text-lg font-semibold text-zinc-950">Latest draft findings and suggestions</h2>
+              <h2 className="mt-1 text-lg font-semibold text-zinc-950">Draft findings held for human review</h2>
             </div>
             <Link
               href="/agents"

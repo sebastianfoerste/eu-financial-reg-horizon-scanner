@@ -406,7 +406,7 @@ async function main() {
             matter.matterType === "TRANSACTION_DILIGENCE"
               ? "Add a regulatory-risk insert to the diligence report and check whether the acquisition model needs a condition precedent or covenant."
               : matter.matterType === "AUTHORISATION"
-                ? "Update the authorisation tracker, filing checklist and client-facing next-step note."
+                ? "Update the authorisation tracker, filing checklist and draft client next-step note for review."
                 : item.publication.tags.regulationFamilies.includes("dora")
                   ? "Update the implementation action register and verify outsourcing, ICT and incident response evidence."
                   : "Prepare a reviewed client note and update the matter knowledge asset if the point is reusable.",
@@ -422,7 +422,7 @@ async function main() {
             matter.matterType === "TRANSACTION_DILIGENCE"
               ? "Add a regulatory-risk insert to the diligence report and check whether the acquisition model needs a condition precedent or covenant."
               : matter.matterType === "AUTHORISATION"
-                ? "Update the authorisation tracker, filing checklist and client-facing next-step note."
+                ? "Update the authorisation tracker, filing checklist and draft client next-step note for review."
                 : item.publication.tags.regulationFamilies.includes("dora")
                   ? "Update the implementation action register and verify outsourcing, ICT and incident response evidence."
                   : "Prepare a reviewed client note and update the matter knowledge asset if the point is reusable.",
@@ -441,7 +441,7 @@ async function main() {
           matter.matterType === "TRANSACTION_DILIGENCE"
             ? "Add a regulatory-risk insert to the diligence report and check whether the acquisition model needs a condition precedent or covenant."
             : matter.matterType === "AUTHORISATION"
-              ? "Update the authorisation tracker, filing checklist and client-facing next-step note."
+              ? "Update the authorisation tracker, filing checklist and draft client next-step note for review."
               : "Update the implementation action register and verify outsourcing, ICT and incident response evidence.",
       };
       await prisma.clientBrief.upsert({

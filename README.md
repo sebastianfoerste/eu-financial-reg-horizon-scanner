@@ -13,6 +13,29 @@ Product-map impact scoring is deterministic and local.
 Only public regulator publication text is eligible for classification unless an approved provider configuration is present.
 External delivery now carries a `horizon-scanner.alert-proof-packet.v1` gate with source authority, currency status, reviewer approval, recipient checks, HTTPS source validation, and a payload digest. Audit logs store the digest and gate metadata, not the alert body.
 
+## Reviewer Demo Path
+
+Start with credential-free proof:
+
+```bash
+npm install
+npm run test
+npm run digest:dry-run
+npm run ingest:fixture
+```
+
+Then run type and build checks:
+
+```bash
+npm run typecheck
+npm run build
+```
+
+For persistent mode, configure `.env.example`, run `npm run prisma:generate`,
+then validate with `npm run prisma:validate`. Production use requires database,
+auth and delivery secrets, plus reviewer approval before any external channel is
+used.
+
 ## Core Features
 ### Implemented Use Cases
 - **Automated feed ingestion and document normalisation.**
@@ -103,7 +126,11 @@ npm run dev
 ```
 
 ## Required Environment Variables
-No environment variables required.
+
+No environment variables are required for dry-run fixture demos. Persistent or
+multi-user review requires `DATABASE_URL` and auth configuration. Delivery
+integrations require provider tokens, kept outside source control. See
+[.env.example](.env.example).
 
 ## Development Commands
 - Start dev server: See [SETUP.md](docs/SETUP.md) for detailed execution commands.
@@ -119,13 +146,36 @@ No environment variables required.
 Deployment steps are configured for local execution and staging review. Ensure no production secrets are deployed directly.
 
 ## Current Status
-- **Classification**: Strong signal
-- **Reasoning**: This repository highlights Sebastian's hands-on abilities in legal technology, AI integration, and regulatory automation. It supports his profile by showcasing clear technical executions.
+Active public-safe regulatory monitoring slice. The strongest proof surfaces are
+source diligence, review readiness checks, alert proof packets and audit
+metadata that avoid storing alert bodies.
 
 ## Known Limitations
 - Requires Postgres Docker container with pgvector extension enabled.
 - Clerk auth integration requires setting up API credentials for full authentication gates.
 - Inngest background workflows need the Inngest local dev agent running (`npx inngest-cli@latest dev`).
+
+## Not Legal Advice
+
+This tool classifies public regulator publications against a deterministic taxonomy and routes findings into a human review queue. Output classifications, impact scores and alert drafts are workflow inputs, not legal assessments. Delivery of any communication based on scanner output requires qualified human review and approval. The tool does not provide legal advice, binding regulatory interpretation or filing guidance.
+
+## Synthetic Demo Data
+
+The bundled fixture publications and product maps are synthetic. They do not represent real regulatory events, actual client products or real matters. Do not use real client product maps, confidential implementation notes or personal recipient lists for screenshots or demos.
+
+## Reviewer Checklist
+
+Use this checklist when evaluating the repository as a portfolio project or employer demo:
+- [ ] Run `npm install && npm run test` - 108 tests pass without credentials.
+- [ ] Run `npm run digest:dry-run` - dry-run digest completes without database or delivery tokens.
+- [ ] Run `npm run ingest:fixture` - fixture ingestion runs without Postgres.
+- [ ] Run `npm run typecheck && npm run build` - TypeScript and Next.js build clean.
+- [ ] Review `tests/alert-proof-packet.test.ts` - confirms delivery is blocked without reviewer approval.
+- [ ] Review `tests/source-hierarchy.test.ts` - confirms source authority levels are enforced.
+- [ ] Review `tests/review-readiness.test.ts` - confirms readiness checks gate publication processing.
+- [ ] Review `docs/DEMO_ASSET_PLAN.md` for demo guidance and hosting readiness assessment.
+- [ ] Confirm no real credentials appear in `.env.example`.
+- [ ] Confirm external delivery is blocked in all fixture and dry-run paths.
 
 ## Deeper Documentation Links
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - High-level system structure and details.
@@ -133,6 +183,7 @@ Deployment steps are configured for local execution and staging review. Ensure n
 - [API.md](docs/API.md) - Endpoint reference and tool interfaces.
 - [SETUP.md](docs/SETUP.md) - Comprehensive setup and configuration.
 - [TESTING.md](docs/TESTING.md) - Automated tests and validation strategy.
+- [DEMO_ASSET_PLAN.md](docs/DEMO_ASSET_PLAN.md) - Screenshot plan and demo guidance.
 - [reviewer-queue-snapshot.md](docs/reviewer-queue-snapshot.md) - Text snapshot of the review queue.
 - [approved-alert-sample.md](docs/approved-alert-sample.md) - Sample approved alert with delivery disabled by default.
 - [AGENTS.md](AGENTS.md) - Guidelines for future coding agents working on this repo.

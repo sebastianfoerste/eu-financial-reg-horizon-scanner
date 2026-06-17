@@ -460,7 +460,7 @@ function buildSuggestedAction(matter: Pick<FirmMatterView, "matterType">, public
     return "Add a regulatory-risk insert to the diligence report and check whether the acquisition model needs a condition precedent or covenant.";
   }
   if (matter.matterType === "AUTHORISATION") {
-    return "Update the authorisation tracker, filing checklist and client-facing next-step note.";
+    return "Update the authorisation tracker, filing checklist and draft client next-step note for review.";
   }
   if (publication.tags.regulationFamilies.includes("dora")) {
     return "Update the implementation action register and verify outsourcing, ICT and incident response evidence.";

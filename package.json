@@ -17,6 +17,7 @@
     "ingest:fixture": "tsx scripts/ingest-fixtures.ts",
     "digest:dry-run": "tsx scripts/dry-run-digest.ts",
     "smoke:routes": "tsx scripts/smoke-routes.ts",
+    "capture-screenshots": "tsx scripts/capture-screenshots.ts",
     "check:fast": "npm run lint && npm run typecheck && npm run test && npm run prisma:validate"
   },
   "dependencies": {
@@ -52,6 +53,7 @@
     "eslint-config-next": "16.2.6",
     "jsdom": "^29.1.1",
     "prisma": "^6.19.3",
+    "puppeteer": "^25.1.0",
     "tailwindcss": "^4",
     "tsx": "^4.22.3",
     "typescript": "^5",

@@ -1,4 +1,4 @@
-# EU Financial Reg Horizon Scanner — LinkedIn Launch Post
+# EU Financial Reg Horizon Scanner - LinkedIn Launch Post
 
 ## Primary post
 
