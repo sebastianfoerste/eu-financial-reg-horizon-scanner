@@ -5,11 +5,28 @@ import { getEnv } from "@/lib/env";
 import { pollTierOneSources } from "@/lib/ingestion/pipeline";
 import { inngest } from "@/inngest/client";
 
-export const pollTierOneSourcesHandler = async ({ step }: { step: any }) => {
+export type StepLike = {
+  run<T>(name: string, fn: () => T | Promise<T>): Promise<T>;
+};
+
+export type RequestedAgentRunEvent = {
+  name?: string;
+  data: {
+    kind?: string;
+    organisationId?: string | null;
+    triggeredByUserId?: string | null;
+    publicationId?: string | null;
+    limit?: number;
+  };
+};
+
+type PollResult = Awaited<ReturnType<typeof pollTierOneSources>>[number];
+
+export const pollTierOneSourcesHandler = async ({ step }: { step: StepLike }) => {
   const results = await step.run("poll tier one adapters", async () => pollTierOneSources());
   return {
     results,
-    failed: results.filter((result: any) => result.status === "FAILED").length,
+    failed: results.filter((result: PollResult) => result.status === "FAILED").length,
   };
 };
 
@@ -22,7 +39,7 @@ export const pollTierOneSourcesFunction = inngest.createFunction(
   pollTierOneSourcesHandler,
 );
 
-export const manualPollSourcesHandler = async ({ step }: { step: any }) => {
+export const manualPollSourcesHandler = async ({ step }: { step: StepLike }) => {
   return step.run("poll tier one adapters", async () => pollTierOneSources());
 };
 
@@ -35,7 +52,7 @@ export const manualPollSourcesFunction = inngest.createFunction(
   manualPollSourcesHandler,
 );
 
-export const prepareDigestPreviewHandler = async ({ step }: { step: any }) => {
+export const prepareDigestPreviewHandler = async ({ step }: { step: StepLike }) => {
   return step.run("render digest preview", async () => getDigestPreview());
 };
 
@@ -48,7 +65,7 @@ export const prepareDigestPreviewFunction = inngest.createFunction(
   prepareDigestPreviewHandler,
 );
 
-export const scheduledSourceMonitorAgentHandler = async ({ step }: { step: any }) => {
+export const scheduledSourceMonitorAgentHandler = async ({ step }: { step: StepLike }) => {
   return step.run("run source monitor agent", async () => {
     if (!getEnv().HORIZON_AGENT_AUTORUN_ENABLED) {
       return { skipped: true, reason: "Agent autorun is disabled." };
@@ -66,15 +83,15 @@ export const scheduledSourceMonitorAgentFunction = inngest.createFunction(
   scheduledSourceMonitorAgentHandler,
 );
 
-export const requestedAgentRunHandler = async ({ event, step }: { event: any; step: any }) => {
+export const requestedAgentRunHandler = async ({
+  event,
+  step,
+}: {
+  event: RequestedAgentRunEvent;
+  step: StepLike;
+}) => {
   return step.run("run requested agent", async () => {
-    const data = event.data as {
-      kind?: string;
-      organisationId?: string | null;
-      triggeredByUserId?: string | null;
-      publicationId?: string | null;
-      limit?: number;
-    };
+    const data = event.data;
     if (!data.kind || !isAgentKind(data.kind)) {
       throw new Error("Requested agent run did not include a known agent kind.");
     }

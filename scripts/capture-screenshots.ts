@@ -1,5 +1,5 @@
 import puppeteer from "puppeteer";
-import { exec } from "node:child_process";
+import { exec, type ChildProcess } from "node:child_process";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -56,7 +56,7 @@ async function capture() {
 }
 
 async function main() {
-  let serverProcess: any = null;
+  let serverProcess: ChildProcess | null = null;
   const alreadyRunning = await isServerRunning();
 
   if (!alreadyRunning) {

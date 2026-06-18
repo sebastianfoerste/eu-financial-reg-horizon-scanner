@@ -5,7 +5,9 @@ import {
   manualPollSourcesHandler,
   prepareDigestPreviewHandler,
   scheduledSourceMonitorAgentHandler,
-  requestedAgentRunHandler
+  requestedAgentRunHandler,
+  type RequestedAgentRunEvent,
+  type StepLike
 } from "@/inngest/functions";
 
 // Mock the dependencies
@@ -37,7 +39,7 @@ vi.mock("@/lib/env", () => ({
 }));
 
 describe("Inngest Handlers", () => {
-  const mockStep = {
+  const mockStep: StepLike = {
     run: vi.fn().mockImplementation((name, fn) => fn())
   };
 
@@ -83,8 +85,19 @@ describe("Inngest Handlers", () => {
   it("skips scheduledSourceMonitorAgentFunction when autorun is disabled", async () => {
     const { getEnv } = await import("@/lib/env");
     vi.mocked(getEnv).mockReturnValueOnce({
-      HORIZON_AGENT_AUTORUN_ENABLED: false
-    } as any);
+      NEXT_PUBLIC_CLERK_SIGN_IN_URL: "/sign-in",
+      NEXT_PUBLIC_CLERK_SIGN_UP_URL: "/sign-up",
+      RESEND_FROM: "EU Financial Reg Scanner <alerts@example.com>",
+      HORIZON_ALLOW_DEMO_MODE: true,
+      HORIZON_EMAIL_DRY_RUN: true,
+      HORIZON_BOT_USER_AGENT: "test-agent",
+      HORIZON_AI_PROVIDER: "stub",
+      HORIZON_AI_MODEL: "stub-classifier-v0",
+      HORIZON_AGENTS_ENABLED: true,
+      HORIZON_AGENT_AUTORUN_ENABLED: false,
+      HORIZON_AGENT_LLM_ENABLED: false,
+      HORIZON_AGENT_MAX_COST_CENTS_PER_RUN: 100,
+    });
 
     const result = await scheduledSourceMonitorAgentHandler({ step: mockStep });
     expect(result).toEqual({
@@ -94,14 +107,14 @@ describe("Inngest Handlers", () => {
   });
 
   it("executes requestedAgentRunFunction with correct arguments", async () => {
-    const mockEvent = {
+    const mockEvent: RequestedAgentRunEvent = {
       name: "agents/run.requested",
       data: {
         kind: "SOURCE_MONITOR",
         limit: 10
       }
     };
-    const result = await requestedAgentRunHandler({ event: mockEvent as any, step: mockStep });
+    const result = await requestedAgentRunHandler({ event: mockEvent, step: mockStep });
     expect(result).toEqual({
       status: "success",
       processed: 5
@@ -110,14 +123,14 @@ describe("Inngest Handlers", () => {
   });
 
   it("rejects requestedAgentRunFunction with invalid kind", async () => {
-    const mockEvent = {
+    const mockEvent: RequestedAgentRunEvent = {
       name: "agents/run.requested",
       data: {
         kind: "INVALID_KIND"
       }
     };
     await expect(
-      requestedAgentRunHandler({ event: mockEvent as any, step: mockStep })
+      requestedAgentRunHandler({ event: mockEvent, step: mockStep })
     ).rejects.toThrow("Requested agent run did not include a known agent kind.");
   });
 });
