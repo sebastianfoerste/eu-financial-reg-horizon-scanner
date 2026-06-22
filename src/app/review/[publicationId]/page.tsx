@@ -8,6 +8,7 @@ import { ImpactExplanationPanel } from "@/components/impact-explanation-panel";
 import { StatusBadge } from "@/components/status-badge";
 import { listLatestAgentArtifacts } from "@/lib/agents/runner";
 import { requireInternalOperator } from "@/lib/authz";
+import { getPublicationParagraphDiffs } from "@/lib/publications";
 import { getReviewItem } from "@/lib/review";
 import { buildRegulatoryActionPacket } from "@/lib/regulatory-action-packet";
 import { summarizeReviewReadiness, type ReviewReadinessStatus } from "@/lib/review-readiness";
@@ -27,18 +28,20 @@ export default async function ReviewDetailPage({ params }: ReviewDetailProps) {
   const item = await getReviewItem(publicationId, organisationId);
   if (!item) notFound();
   const publication = item.publication;
-  const [agentArtifacts, diligence] = await Promise.all([
+  const [agentArtifacts, diligence, paragraphDiffs] = await Promise.all([
     listLatestAgentArtifacts({
       organisationId,
       publicationId: publication.id,
       take: 6,
     }),
     listSourceDiligence(),
+    getPublicationParagraphDiffs(publication.id),
   ]);
   const readiness = summarizeReviewReadiness(item);
   const actionPacket = buildRegulatoryActionPacket({
     reviewItem: item,
     sourceDiligence: diligence.find((record) => record.sourceCode === publication.sourceCode),
+    paragraphDiffs,
   });
 
   return (
@@ -197,6 +200,16 @@ export default async function ReviewDetailPage({ params }: ReviewDetailProps) {
                 <div className="flex justify-between gap-3">
                   <dt className="text-zinc-500">Alert eligible</dt>
                   <dd className="text-right font-medium text-zinc-950">{actionPacket.alert_eligibility.eligible ? "Yes" : "No"}</dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-zinc-500">Paragraph changes</dt>
+                  <dd className="text-right font-medium text-zinc-950">
+                    {actionPacket.change_proof.paragraph_diff_count}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-zinc-500">Text retention</dt>
+                  <dd className="text-right font-medium text-zinc-950">Hashes only</dd>
                 </div>
                 <div className="flex justify-between gap-3">
                   <dt className="text-zinc-500">Digest</dt>

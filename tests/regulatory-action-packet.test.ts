@@ -91,6 +91,15 @@ describe("regulatory action packet", () => {
           createdAt: "2026-06-16T09:10:00.000Z",
         },
       ],
+      paragraphDiffs: [
+        {
+          paragraphIndex: 2,
+          changeType: "CHANGED",
+          beforeText: "OLD PARAGRAPH TEXT MUST NOT ENTER THE ACTION PACKET",
+          afterText: "NEW PARAGRAPH TEXT MUST NOT ENTER THE ACTION PACKET",
+          semanticSummary: "Reviewer should inspect a changed filing paragraph.",
+        },
+      ],
       generatedAt: "2026-06-16T09:15:00.000Z",
     });
 
@@ -100,8 +109,21 @@ describe("regulatory action packet", () => {
     expect(packet.review_gate.ready_for_alert_draft).toBe(true);
     expect(packet.alert_eligibility.eligible).toBe(true);
     expect(packet.source_status.authority_level).toBe("supervisory_material");
+    expect(packet.change_proof).toMatchObject({
+      paragraph_diff_count: 1,
+      text_retention: "hashes_only",
+    });
+    expect(packet.change_proof.changed_paragraphs[0]).toMatchObject({
+      paragraph_index: 2,
+      change_type: "CHANGED",
+      semantic_summary: "Reviewer should inspect a changed filing paragraph.",
+    });
+    expect(packet.change_proof.changed_paragraphs[0].before_hash).toHaveLength(64);
+    expect(packet.change_proof.changed_paragraphs[0].after_hash).toHaveLength(64);
     expect(packet.digest).toHaveLength(64);
     expect(json).not.toContain("RAW PUBLICATION BODY MUST NOT ENTER THE ACTION PACKET");
+    expect(json).not.toContain("OLD PARAGRAPH TEXT MUST NOT ENTER THE ACTION PACKET");
+    expect(json).not.toContain("NEW PARAGRAPH TEXT MUST NOT ENTER THE ACTION PACKET");
   });
 
   it("surfaces blocked alert proof packets as action blockers", () => {

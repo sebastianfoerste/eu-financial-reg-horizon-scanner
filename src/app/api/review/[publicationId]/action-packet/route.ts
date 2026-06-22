@@ -1,6 +1,7 @@
 import { requireInternalOperator } from "@/lib/authz";
 import { assertDemoModeAllowed, hasDatabaseUrl } from "@/lib/env";
 import { getPrisma } from "@/lib/prisma";
+import { getPublicationParagraphDiffs } from "@/lib/publications";
 import { buildRegulatoryActionPacket, type RegulatoryActionProofSummary } from "@/lib/regulatory-action-packet";
 import { getReviewItem } from "@/lib/review";
 import { listSourceDiligence } from "@/lib/source-diligence";
@@ -20,9 +21,10 @@ export async function GET(_request: Request, context: { params: Promise<{ public
     return Response.json({ error: "Action packet JSON is exposed only for approved review items." }, { status: 409 });
   }
 
-  const [diligence, proofPackets] = await Promise.all([
+  const [diligence, proofPackets, paragraphDiffs] = await Promise.all([
     listSourceDiligence(),
     listProofPacketsForPublication(item.publication.id),
+    getPublicationParagraphDiffs(item.publication.id),
   ]);
 
   return Response.json(
@@ -30,6 +32,7 @@ export async function GET(_request: Request, context: { params: Promise<{ public
       reviewItem: item,
       sourceDiligence: diligence.find((record) => record.sourceCode === item.publication.sourceCode),
       alertProofPackets: proofPackets,
+      paragraphDiffs,
     }),
   );
 }

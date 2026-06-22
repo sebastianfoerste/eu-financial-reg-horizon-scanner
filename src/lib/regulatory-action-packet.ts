@@ -13,6 +13,28 @@ export type RegulatoryActionProofSummary = {
   createdAt: string;
 };
 
+export type RegulatoryActionParagraphDiffInput = {
+  paragraphIndex: number;
+  changeType: "ADDED" | "REMOVED" | "CHANGED" | "UNCHANGED";
+  beforeHash?: string | null;
+  afterHash?: string | null;
+  beforeText?: string | null;
+  afterText?: string | null;
+  semanticSummary: string | null;
+};
+
+export type RegulatoryActionChangeProof = {
+  paragraph_diff_count: number;
+  changed_paragraphs: Array<{
+    paragraph_index: number;
+    change_type: "ADDED" | "REMOVED" | "CHANGED" | "UNCHANGED";
+    before_hash: string | null;
+    after_hash: string | null;
+    semantic_summary: string | null;
+  }>;
+  text_retention: "hashes_only";
+};
+
 export type RegulatoryActionPacket = {
   schema: "horizon-scanner.regulatory-action-packet.v1";
   generated_at: string;
@@ -50,6 +72,7 @@ export type RegulatoryActionPacket = {
     latest_payload_digest: string | null;
     reasons: string[];
   };
+  change_proof: RegulatoryActionChangeProof;
   service_routing_hints: {
     service_offering_ids: string[];
     impact_bucket: string;
@@ -66,6 +89,7 @@ export function buildRegulatoryActionPacket(input: {
   reviewItem: ReviewQueueView;
   sourceDiligence?: SourceDiligenceView | null;
   alertProofPackets?: RegulatoryActionProofSummary[];
+  paragraphDiffs?: RegulatoryActionParagraphDiffInput[];
   generatedAt?: string;
 }): RegulatoryActionPacket {
   const publication = input.reviewItem.publication;
@@ -119,6 +143,7 @@ export function buildRegulatoryActionPacket(input: {
       latest_payload_digest: latestProof?.payloadDigest ?? null,
       reasons: latestProof?.reasons ?? [],
     },
+    change_proof: buildChangeProof(input.paragraphDiffs ?? []),
     service_routing_hints: {
       service_offering_ids: publication.serviceOfferingIds,
       impact_bucket: publication.impactBucket,
@@ -134,6 +159,31 @@ export function buildRegulatoryActionPacket(input: {
     ...unsigned,
     digest: createHash("sha256").update(stableStringify(unsigned)).digest("hex"),
   };
+}
+
+function buildChangeProof(diffs: RegulatoryActionParagraphDiffInput[]): RegulatoryActionChangeProof {
+  const changed = diffs.filter((diff) => diff.changeType !== "UNCHANGED");
+
+  return {
+    paragraph_diff_count: changed.length,
+    changed_paragraphs: changed.map((diff) => ({
+      paragraph_index: diff.paragraphIndex,
+      change_type: diff.changeType,
+      before_hash: diff.beforeHash ?? hashOptionalText(diff.beforeText),
+      after_hash: diff.afterHash ?? hashOptionalText(diff.afterText),
+      semantic_summary: capOptionalText(diff.semanticSummary, 220),
+    })),
+    text_retention: "hashes_only",
+  };
+}
+
+function hashOptionalText(value: string | null | undefined) {
+  return value ? createHash("sha256").update(value, "utf8").digest("hex") : null;
+}
+
+function capOptionalText(value: string | null | undefined, limit: number) {
+  if (!value) return null;
+  return capText(value, limit);
 }
 
 function capText(value: string, limit: number) {
