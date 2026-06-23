@@ -173,7 +173,6 @@ Use this checklist when evaluating the repository as a portfolio project or empl
 - [ ] Review `tests/alert-proof-packet.test.ts` - confirms delivery is blocked without reviewer approval.
 - [ ] Review `tests/source-hierarchy.test.ts` - confirms source authority levels are enforced.
 - [ ] Review `tests/review-readiness.test.ts` - confirms readiness checks gate publication processing.
-- [ ] Review `docs/DEMO_ASSET_PLAN.md` for demo guidance and hosting readiness assessment.
 - [ ] Confirm no real credentials appear in `.env.example`.
 - [ ] Confirm external delivery is blocked in all fixture and dry-run paths.
 
@@ -183,7 +182,6 @@ Use this checklist when evaluating the repository as a portfolio project or empl
 - [API.md](docs/API.md) - Endpoint reference and tool interfaces.
 - [SETUP.md](docs/SETUP.md) - Comprehensive setup and configuration.
 - [TESTING.md](docs/TESTING.md) - Automated tests and validation strategy.
-- [DEMO_ASSET_PLAN.md](docs/DEMO_ASSET_PLAN.md) - Screenshot plan and demo guidance.
 - [reviewer-queue-snapshot.md](docs/reviewer-queue-snapshot.md) - Text snapshot of the review queue.
 - [approved-alert-sample.md](docs/approved-alert-sample.md) - Sample approved alert with delivery disabled by default.
 - [AGENTS.md](AGENTS.md) - Guidelines for future coding agents working on this repo.
