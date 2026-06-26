@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "postinstall": "npm run prisma:generate",
     "prisma:validate": "DATABASE_URL=${DATABASE_URL:-postgresql://horizon:horizon@localhost:5438/horizon_scanner?schema=public} prisma validate",
     "prisma:generate": "DATABASE_URL=${DATABASE_URL:-postgresql://horizon:horizon@localhost:5438/horizon_scanner?schema=public} prisma generate",
     "prisma:migrate": "DATABASE_URL=${DATABASE_URL:-postgresql://horizon:horizon@localhost:5438/horizon_scanner?schema=public} prisma migrate dev",
