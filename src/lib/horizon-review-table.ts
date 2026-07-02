@@ -19,6 +19,39 @@ type DeliveryReadiness = {
   }>;
 };
 
+export type HorizonReviewCellStatus = "complete" | "needs_review" | "blocked";
+
+export type HorizonReviewTableCell = {
+  columnId: (typeof HORIZON_REVIEW_TABLE_COLUMN_IDS)[number];
+  label: string;
+  value: string;
+  status: HorizonReviewCellStatus;
+  reviewer: string;
+  reviewGate: string;
+  externalActionAllowed: false;
+};
+
+export type HorizonPinpointCitation = {
+  sourceId: string;
+  sourceClass: "regulator_publication" | "source_diligence" | "proof_packet";
+  citationLabel: string;
+  url: string | null;
+  rawHash: string | null;
+  quote: string;
+  offsetStart: number;
+  offsetEnd: number;
+  verified: boolean;
+};
+
+export type HorizonPlaybookProjection = {
+  id: string;
+  label: string;
+  jurisdiction: "EU";
+  topics: string[];
+  reviewGate: string;
+  externalActionAllowed: false;
+};
+
 export type HorizonReviewTableRow = {
   id: string;
   publicationId: string;
@@ -34,6 +67,11 @@ export type HorizonReviewTableRow = {
   deliveryStatus: "ready_for_delivery" | "draft_only" | "blocked";
   blockers: string[];
   nextAction: string;
+  reviewerQueuePosition: number;
+  reviewerDecision: string;
+  playbook: HorizonPlaybookProjection;
+  citations: HorizonPinpointCitation[];
+  cells: HorizonReviewTableCell[];
 };
 
 export type HorizonReviewTableSummary = {
@@ -179,6 +217,7 @@ export type HorizonMonitorProfile = {
       signOffRequired: boolean;
     }>;
   };
+  workspaceProfile: HorizonMonitorWorkspaceProfile;
   securityGovernance: {
     zeroTrust: true;
     noFoundationModelTraining: true;
@@ -191,6 +230,18 @@ export type HorizonMonitorProfile = {
   reviewNotice: string;
 };
 
+export type HorizonMonitorWorkspaceProfile = {
+  schema: "horizon-scanner.monitor-workspace.v1";
+  sourceMode: "public_regulator_sources";
+  jurisdictions: string[];
+  topics: string[];
+  sourceControls: string[];
+  affectedProducts: string[];
+  proofPacketStatus: HorizonReviewTableSummary;
+  deliveryGate: "blocked_without_review" | "reviewed_local_export";
+  externalActionAllowed: false;
+};
+
 export type HorizonReviewTable = {
   rows: HorizonReviewTableRow[];
   summary: HorizonReviewTableSummary;
@@ -198,6 +249,7 @@ export type HorizonReviewTable = {
   reviewTableScale: HorizonReviewTableScale;
   promptBrief: HorizonPromptImprovementBrief;
   monitorProfile: HorizonMonitorProfile;
+  workspaceProfile: HorizonMonitorWorkspaceProfile;
 };
 
 const HORIZON_REVIEW_TABLE_COLUMN_IDS = [
@@ -274,6 +326,160 @@ function nextAction(row: Pick<HorizonReviewTableRow, "blockers" | "proofPacketSt
   return "Ready for reviewed delivery or archive after supervisory review.";
 }
 
+function reviewerDecision(reviewItem: ReviewQueueView | undefined) {
+  if (!reviewItem) return "No reviewer decision recorded.";
+  if (reviewItem.decisionReason) return reviewItem.decisionReason;
+  if (reviewItem.status === "APPROVED") return "Approved publication row. Decision reason should be recorded before delivery.";
+  return `Decision pending. Current reviewer state is ${statusLabel(reviewItem.status)}.`;
+}
+
+function playbookForPublication(publication: PublicationListItem): HorizonPlaybookProjection {
+  const topics = unique([
+    ...publication.matchedTopics,
+    ...publication.matchedActivities,
+    ...publication.matchedLicences,
+    publication.impactBucket,
+  ]).slice(0, 5);
+  const primaryTopic = topics[0]?.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-") ?? "general";
+  return {
+    id: `monitor-playbook-${primaryTopic}`,
+    label: `${topics[0] ?? "Regulatory"} monitoring playbook`,
+    jurisdiction: "EU",
+    topics,
+    reviewGate: "Apply playbook as draft triage only. Reviewer sign-off is required for legal conclusions.",
+    externalActionAllowed: false,
+  };
+}
+
+function buildPinpointCitations({
+  publication,
+  source,
+  alert,
+  citationCoverage,
+}: {
+  publication: PublicationListItem;
+  source: SourceDiligenceView | undefined;
+  alert: AlertView | undefined;
+  citationCoverage: HorizonReviewTableRow["citationCoverage"];
+}): HorizonPinpointCitation[] {
+  const titleQuote = publication.title;
+  const citations: HorizonPinpointCitation[] = [
+    {
+      sourceId: publication.id,
+      sourceClass: "regulator_publication",
+      citationLabel: `${publication.sourceName}: ${publication.publicationType}`,
+      url: publication.sourceUrl,
+      rawHash: publication.rawHash,
+      quote: titleQuote,
+      offsetStart: 0,
+      offsetEnd: titleQuote.length,
+      verified: citationCoverage === "complete",
+    },
+  ];
+  if (source) {
+    const attributionRequirement = source.attributionRequirement ?? "Source attribution requirement not recorded.";
+    citations.push({
+      sourceId: source.id,
+      sourceClass: "source_diligence",
+      citationLabel: `${source.sourceName} source diligence`,
+      url: source.baseUrl,
+      rawHash: publication.rawHash,
+      quote: attributionRequirement,
+      offsetStart: 0,
+      offsetEnd: attributionRequirement.length,
+      verified: citationCoverage !== "blocked",
+    });
+  }
+  const proofPacket = alert?.proofPackets[0];
+  if (proofPacket) {
+    citations.push({
+      sourceId: proofPacket.id,
+      sourceClass: "proof_packet",
+      citationLabel: `Proof packet ${proofPacket.gateStatus}`,
+      url: alert?.payload.publicationUrl ?? null,
+      rawHash: proofPacket.payloadDigest,
+      quote: proofPacket.reasons.join("; ") || proofPacket.gateStatus,
+      offsetStart: 0,
+      offsetEnd: (proofPacket.reasons.join("; ") || proofPacket.gateStatus).length,
+      verified: proofPacket.gateStatus === "ready_for_delivery",
+    });
+  }
+  return citations;
+}
+
+function reviewCellStatus(row: HorizonReviewTableRow, columnId: HorizonReviewTableCell["columnId"]) {
+  if (row.deliveryStatus === "blocked" && ["delivery_status", "blockers", "next_action"].includes(columnId)) {
+    return "blocked" as const;
+  }
+  if (
+    columnId === "proof_packet_status" &&
+    (row.proofPacketStatus === "blocked" || row.proofPacketStatus === "missing")
+  ) {
+    return "blocked" as const;
+  }
+  if (columnId === "citation_coverage" && row.citationCoverage !== "complete") {
+    return row.citationCoverage === "blocked" ? ("blocked" as const) : ("needs_review" as const);
+  }
+  if (columnId === "review_status" && row.reviewStatus !== "approved") return "needs_review" as const;
+  if (columnId === "assigned_reviewer" && row.assignedReviewer === "Unassigned") return "needs_review" as const;
+  return "complete" as const;
+}
+
+function reviewCellValue(row: HorizonReviewTableRow, columnId: HorizonReviewTableCell["columnId"]) {
+  switch (columnId) {
+    case "publication":
+      return row.title;
+    case "source_freshness":
+      return row.sourceFreshness;
+    case "affected_products":
+      return row.affectedProducts.join(", ") || "No product match";
+    case "assigned_reviewer":
+      return row.assignedReviewer;
+    case "review_status":
+      return row.reviewStatus;
+    case "proof_packet_status":
+      return row.proofPacketStatus;
+    case "citation_coverage":
+      return row.citationCoverage;
+    case "alert_status":
+      return row.alertStatus;
+    case "delivery_status":
+      return row.deliveryStatus;
+    case "blockers":
+      return row.blockers.join("; ") || "No blockers";
+    case "next_action":
+      return row.nextAction;
+  }
+}
+
+function buildReviewCells(row: HorizonReviewTableRow): HorizonReviewTableCell[] {
+  const labels: Record<HorizonReviewTableCell["columnId"], string> = {
+    publication: "Publication",
+    source_freshness: "Source freshness",
+    affected_products: "Affected products",
+    assigned_reviewer: "Assigned reviewer",
+    review_status: "Review status",
+    proof_packet_status: "Proof packet status",
+    citation_coverage: "Citation coverage",
+    alert_status: "Alert status",
+    delivery_status: "Delivery status",
+    blockers: "Blockers",
+    next_action: "Next action",
+  };
+  return HORIZON_REVIEW_TABLE_COLUMN_IDS.map((columnId) => ({
+    columnId,
+    label: labels[columnId],
+    value: reviewCellValue(row, columnId),
+    status: reviewCellStatus(row, columnId),
+    reviewer: row.assignedReviewer,
+    reviewGate:
+      columnId === "delivery_status"
+        ? "External delivery remains blocked until a reviewed action explicitly sends it."
+        : "Named reviewer must verify this cell before relying on the row.",
+    externalActionAllowed: false,
+  }));
+}
+
 export function buildHorizonReviewTable(input: {
   publications: PublicationListItem[];
   reviewItems: ReviewQueueView[];
@@ -311,6 +517,13 @@ export function buildHorizonReviewTable(input: {
           : proofStatus === "ready"
             ? ("ready_for_delivery" as const)
             : ("draft_only" as const);
+      const playbook = playbookForPublication(publication);
+      const citations = buildPinpointCitations({
+        publication,
+        source,
+        alert,
+        citationCoverage,
+      });
       const row = {
         id: `horizon-review-${publication.id}`,
         publicationId: publication.id,
@@ -330,6 +543,11 @@ export function buildHorizonReviewTable(input: {
         deliveryStatus,
         blockers,
         nextAction: "",
+        reviewerQueuePosition: 0,
+        reviewerDecision: reviewerDecision(reviewItem),
+        playbook,
+        citations,
+        cells: [],
       } satisfies HorizonReviewTableRow;
 
       return { ...row, nextAction: nextAction(row) };
@@ -338,6 +556,10 @@ export function buildHorizonReviewTable(input: {
       const deliveryDelta = Number(right.deliveryStatus === "blocked") - Number(left.deliveryStatus === "blocked");
       if (deliveryDelta !== 0) return deliveryDelta;
       return right.blockers.length - left.blockers.length;
+    })
+    .map((row, index) => {
+      const queuedRow = { ...row, reviewerQueuePosition: index + 1 };
+      return { ...queuedRow, cells: buildReviewCells(queuedRow) };
     });
 
   const summary = {
@@ -356,18 +578,21 @@ export function buildHorizonReviewTable(input: {
   });
   const reviewTableScale = buildReviewTableScale(rows);
   const promptBrief = buildPromptBrief({ rows, summary, deliveryReadiness: input.deliveryReadiness });
+  const workspaceProfile = buildWorkspaceProfile({ rows, summary });
   return {
     rows,
     summary,
     controlProfile,
     reviewTableScale,
     promptBrief,
+    workspaceProfile,
     monitorProfile: buildMonitorProfile({
       rows,
       summary,
       controlProfile,
       reviewTableScale,
       promptBrief,
+      workspaceProfile,
       sourceCount: sourcesByCode.size,
     }),
   };
@@ -546,12 +771,33 @@ function buildControlProfile({
   };
 }
 
+function buildWorkspaceProfile({
+  rows,
+  summary,
+}: {
+  rows: HorizonReviewTableRow[];
+  summary: HorizonReviewTableSummary;
+}): HorizonMonitorWorkspaceProfile {
+  return {
+    schema: "horizon-scanner.monitor-workspace.v1",
+    sourceMode: "public_regulator_sources",
+    jurisdictions: ["EU"],
+    topics: unique(rows.flatMap((row) => row.playbook.topics)).slice(0, 8),
+    sourceControls: unique(rows.flatMap((row) => row.citations.map((citation) => citation.sourceClass))),
+    affectedProducts: unique(rows.flatMap((row) => row.affectedProducts)).slice(0, 10),
+    proofPacketStatus: summary,
+    deliveryGate: summary.readyRows > 0 && summary.blockedRows === 0 ? "reviewed_local_export" : "blocked_without_review",
+    externalActionAllowed: false,
+  };
+}
+
 function buildMonitorProfile({
   rows,
   summary,
   controlProfile,
   reviewTableScale,
   promptBrief,
+  workspaceProfile,
   sourceCount,
 }: {
   rows: HorizonReviewTableRow[];
@@ -559,6 +805,7 @@ function buildMonitorProfile({
   controlProfile: HorizonReviewControlProfile;
   reviewTableScale: HorizonReviewTableScale;
   promptBrief: HorizonPromptImprovementBrief;
+  workspaceProfile: HorizonMonitorWorkspaceProfile;
   sourceCount: number;
 }): HorizonMonitorProfile {
   const coverage = {
@@ -711,6 +958,7 @@ function buildMonitorProfile({
         },
       ],
     },
+    workspaceProfile,
     securityGovernance: {
       zeroTrust: true,
       noFoundationModelTraining: true,

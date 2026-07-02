@@ -110,10 +110,26 @@ describe("horizon review table", () => {
       proofPacketStatus: "ready",
       citationCoverage: "complete",
       deliveryStatus: "ready_for_delivery",
+      reviewerQueuePosition: 2,
+      reviewerDecision: "Approved publication row. Decision reason should be recorded before delivery.",
+    });
+    expect(readyRow?.playbook).toMatchObject({
+      jurisdiction: "EU",
+      externalActionAllowed: false,
+    });
+    expect(readyRow?.citations.some((citation) => citation.sourceClass === "regulator_publication")).toBe(true);
+    expect(readyRow?.citations.some((citation) => citation.sourceClass === "proof_packet" && citation.verified)).toBe(true);
+    expect(readyRow?.cells).toHaveLength(11);
+    expect(readyRow?.cells.every((cell) => cell.externalActionAllowed === false)).toBe(true);
+    expect(readyRow?.cells.find((cell) => cell.columnId === "delivery_status")).toMatchObject({
+      value: "ready_for_delivery",
+      status: "complete",
     });
     expect(blockedRow?.deliveryStatus).toBe("blocked");
+    expect(blockedRow?.reviewerQueuePosition).toBe(1);
     expect(blockedRow?.blockers).toContain("Human review approval missing.");
     expect(blockedRow?.blockers).toContain("Reviewed alert draft has not been generated.");
+    expect(blockedRow?.cells.find((cell) => cell.columnId === "delivery_status")?.status).toBe("blocked");
     expect(table.controlProfile.schema).toBe("horizon-scanner.alert-review-control.v1");
     expect(table.controlProfile.externalActionAllowed).toBe(false);
     expect(table.controlProfile.workflowRoutes.at(-1)).toMatchObject({
@@ -154,6 +170,10 @@ describe("horizon review table", () => {
     expect(table.monitorProfile.portalRoom.externalGuestAccessAllowed).toBe(false);
     expect(table.monitorProfile.securityGovernance.approvalGate).toBe("required_for_alert_delivery");
     expect(table.monitorProfile.lists.items.length).toBeGreaterThan(0);
+    expect(table.monitorProfile.workspaceProfile.schema).toBe("horizon-scanner.monitor-workspace.v1");
+    expect(table.monitorProfile.workspaceProfile.externalActionAllowed).toBe(false);
+    expect(table.workspaceProfile.sourceControls).toContain("regulator_publication");
+    expect(table.workspaceProfile.deliveryGate).toBe("blocked_without_review");
     expect(table.monitorProfile.aosLayers.map((layer) => layer.key)).toContain("security_governance");
     expect(table.monitorProfile.reviewNotice).toContain("no Legora integration or dependency");
   });
