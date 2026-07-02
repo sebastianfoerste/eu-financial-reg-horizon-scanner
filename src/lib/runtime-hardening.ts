@@ -1,3 +1,5 @@
+import { connect } from "node:net";
+
 import { getEnv, hasDatabaseUrl, isDemoModeAllowed } from "@/lib/env";
 import { getPrisma } from "@/lib/prisma";
 
@@ -80,9 +82,23 @@ export function getRuntimeChecks(): RuntimeCheck[] {
 
 export async function getRuntimeChecksWithDatabaseProbe() {
   const checks = getRuntimeChecks();
-  if (!hasDatabaseUrl()) return checks;
+  const env = getEnv();
+  if (!hasDatabaseUrl() || !env.DATABASE_URL) return checks;
 
   try {
+    const reachable = await isDatabaseSocketReachable(env.DATABASE_URL, 750);
+    if (!reachable) {
+      return checks.map((check) =>
+        check.key === "database"
+          ? {
+              ...check,
+              ok: false,
+              severity: "error" as const,
+              message: "Postgres configured but unavailable or timed out.",
+            }
+          : check,
+      );
+    }
     await getPrisma().$queryRaw`SELECT 1`;
     return checks.map((check) =>
       check.key === "database"
@@ -92,8 +108,39 @@ export async function getRuntimeChecksWithDatabaseProbe() {
   } catch {
     return checks.map((check) =>
       check.key === "database"
-        ? { ...check, ok: false, severity: "error" as const, message: "Postgres configured but unavailable." }
+        ? {
+            ...check,
+            ok: false,
+            severity: "error" as const,
+            message: "Postgres configured but unavailable.",
+          }
         : check,
     );
   }
+}
+
+async function isDatabaseSocketReachable(databaseUrl: string, timeoutMs: number) {
+  let parsed: URL;
+  try {
+    parsed = new URL(databaseUrl);
+  } catch {
+    return true;
+  }
+  if (!["postgres:", "postgresql:"].includes(parsed.protocol)) return true;
+
+  return new Promise<boolean>((resolve) => {
+    const socket = connect({
+      host: parsed.hostname,
+      port: parsed.port ? Number(parsed.port) : 5432,
+    });
+    const finish = (reachable: boolean) => {
+      socket.removeAllListeners();
+      socket.destroy();
+      resolve(reachable);
+    };
+    socket.setTimeout(timeoutMs);
+    socket.once("connect", () => finish(true));
+    socket.once("timeout", () => finish(false));
+    socket.once("error", () => finish(false));
+  });
 }
