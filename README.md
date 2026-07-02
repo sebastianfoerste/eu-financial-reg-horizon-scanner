@@ -42,6 +42,7 @@ used.
 - **Vector-based semantic search and regulatory mapping.**
 - **Reviewer queue with approval controls.**
 - **Organization-gated dashboard views (Clerk integration).**
+- **Monitor review profile**: Exposes `horizon-scanner.monitor-review.v1`, a Legora-inspired product pattern, no Legora integration or dependency. It covers regulatory perimeter, source controls, tabular review, draft alert skills, Portal-style operator room, Lists tasks and blocked external delivery.
 
 ### Future Use Cases
 - **Automatic paragraph diffing comparing consecutive law drafts.**

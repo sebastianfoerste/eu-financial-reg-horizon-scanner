@@ -23,6 +23,14 @@
 - **Current limitations**: Requires local Inngest dev server to run background jobs locally.
 - **Possible improvements**: Support fallback cron systems if Inngest is unavailable.
 
+### Monitor Review Profile
+
+- **What it does**: Adds `horizon-scanner.monitor-review.v1` to the deterministic alert review table.
+- **Why it matters**: Gives operators one review-gated profile for regulatory perimeter, source controls, draft alert Skills, tabular review, Portal-style operator room, Lists tasks and governance gates.
+- **Where it is implemented**: `src/lib/horizon-review-table.ts`, `src/app/page.tsx`
+- **Input**: Public regulator publications, source diligence, review queue, alert drafts and product-map delivery readiness.
+- **Output**: Legora-inspired product pattern, no Legora integration or dependency. Rows include review cells, pinpoint citations, reviewer decisions and blocked delivery status. `externalActionAllowed` is false.
+
 ## Implementation Status
 - All core features listed are implemented.
 - Mock servers and endpoints simulate external third-party API services.

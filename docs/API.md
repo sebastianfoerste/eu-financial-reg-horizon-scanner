@@ -35,6 +35,16 @@ The packet contains:
 
 The audit log stores the proof summary and digest only. It does not store the alert body again.
 
+## Monitor Review Profile
+
+`buildHorizonReviewTable()` returns `horizon-scanner.monitor-review.v1` as `monitorProfile`.
+
+The profile is a Legora-inspired product pattern, no Legora integration or dependency. It contains `aosLayers`, `agentPlan`, `skills`, `tabularReview`, `trustedSources`, `editorDraft`, `wordExportPackage`, `portalRoom`, `monitors`, `lists`, `securityGovernance`, `legoraIntegration` and `externalActionAllowed`.
+
+Each review row also exposes `cells` and `citations`. Cells carry the column id, reviewer-facing value, status, citation count, blocker text and next action. Citations carry the source id, citation label, URL, source status, quote hash, verification flag and legal status class. The deterministic review table remains the source of truth for affected products, ownership, proof-packet status, blocked delivery indicators and reviewer decision.
+
+`externalActionAllowed` is false. The profile is a local projection over public regulator publications, source diligence, review queue state, proof packet status and product-map readiness.
+
 ## Authentication And Configuration
 
 The app supports demo-mode fixtures when no database URL is present. Production-like operation requires Postgres, Clerk configuration, and explicitly enabled integration settings for external delivery providers.
