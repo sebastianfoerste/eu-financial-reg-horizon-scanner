@@ -2,7 +2,7 @@
 
 The EU Financial Reg Horizon Scanner is a regulatory monitoring prototype for EU financial regulation. It uses public regulator publications, deterministic classification, product-impact scoring, reviewer queues, approval gates and audit metadata.
 
-## Reviewer demo path
+## Local verification
 
 ```bash
 npm install
@@ -20,7 +20,7 @@ npm run build
 - Product-impact scoring over synthetic profiles.
 - Human reviewer queue.
 - Approved alert draft workflow.
-- Monitor review table: turns public regulator publications into review rows with source status, affected products, owner, proof-packet status, delivery blockers and next action.
+- Monitor review table: turns public regulator publications into review rows with source status, affected products, owner, evidence-packet status, delivery blockers and next action.
 
 ## Demo coverage
 
