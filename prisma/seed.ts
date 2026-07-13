@@ -23,6 +23,26 @@ async function main() {
   const seededConfirmationDueAt = new Date("2026-08-27T00:00:00.000Z");
   await syncTaxonomyConfig();
   await syncSources(getTierOneAdapters());
+  for (const publication of mockPublications) {
+    const existingSource = await prisma.source.findUnique({
+      where: { code: publication.sourceCode },
+      select: { id: true },
+    });
+    if (!existingSource) {
+      await prisma.source.create({
+        data: {
+          code: publication.sourceCode,
+          displayName: `${publication.sourceCode.toUpperCase()} synthetic fixture source`,
+          jurisdictionCode: publication.sourceCode === "bafin" ? "de" : "eu",
+          baseUrl: new URL(publication.sourceUrl).origin,
+          feedType: "API",
+          language: publication.language,
+          notes: "Synthetic local seed source. External polling is not configured.",
+          isActive: false,
+        },
+      });
+    }
+  }
   await syncAgentDefinitions();
   await seedDefaultSavedViews();
 

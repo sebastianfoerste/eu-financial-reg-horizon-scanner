@@ -480,6 +480,63 @@ model ClassificationRevision {
   @@index([publicationId, createdAt])
 }
 
+model ResearchPlan {
+  id                   String   @id @default(cuid())
+  organisationId       String?
+  publicationId        String
+  publicationVersionId String
+  taxonomyVersion      String
+  jurisdictions        String[]
+  questions            String[]
+  passagesJson         Json
+  unresolvedQuestions  String[]
+  status               String   @default("REVIEW_REQUIRED")
+  createdById          String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([publicationId, publicationVersionId])
+  @@index([organisationId, status])
+}
+
+model PublicationReviewComment {
+  id           String   @id @default(cuid())
+  reviewItemId String
+  targetId     String
+  body         String   @db.Text
+  actorId      String?
+  actorName    String
+  status       String   @default("OPEN")
+  createdAt    DateTime @default(now())
+  resolvedAt   DateTime?
+
+  @@index([reviewItemId, status])
+}
+
+model PublicationReviewLock {
+  id           String   @id @default(cuid())
+  reviewItemId String   @unique
+  revision     Int      @default(1)
+  lockedById   String
+  expiresAt    DateTime
+  updatedAt    DateTime @updatedAt
+}
+
+model BriefRevision {
+  id                   String   @id @default(cuid())
+  publicationId        String
+  publicationVersionId String
+  contentMarkdown      String   @db.Text
+  changesJson          Json
+  evidenceRefs         String[]
+  status               String   @default("REVIEW_REQUIRED")
+  reviewerId           String?
+  createdAt            DateTime @default(now())
+  reviewedAt           DateTime?
+
+  @@index([publicationId, createdAt])
+}
+
 model PublicationParagraph {
   id             String       @id @default(cuid())
   publicationId  String

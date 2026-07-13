@@ -51,6 +51,12 @@ export default async function BriefingPage() {
               Internal briefing only. It turns the current publication estate into an operator decision record without
               sending email, Slack, Teams, HubSpot or public content.
             </p>
+            <a
+              href="/api/briefing/dossier"
+              className="mt-4 inline-flex h-9 items-center rounded-md border border-zinc-300 bg-white px-3 text-sm font-semibold text-zinc-900 hover:bg-zinc-50"
+            >
+              Download decision dossier
+            </a>
           </div>
           <div className={cn("rounded-md border p-4", statusClasses[briefing.status])}>
             <div className="flex items-center gap-2">
