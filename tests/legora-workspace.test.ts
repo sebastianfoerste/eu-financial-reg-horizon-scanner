@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildDemoLegoraWorkspace, canExportBrief, decideBriefChange, lockPublicationReview } from "@/lib/legora-workspace";
+import { workspaceIds } from "@/lib/legora-persistence";
 
 describe("research, collaboration and evidence editor", () => {
   it("keeps taxonomy and publication versions on research plans", () => {
@@ -20,5 +21,14 @@ describe("research, collaboration and evidence editor", () => {
     expect(canExportBrief(decided)).toBe(false);
     expect(canExportBrief({ ...decided, reviewerApproved: true })).toBe(true);
     expect(decided.externalDeliveryAllowed).toBe(false);
+  });
+
+  it("derives isolated persistence identifiers for each organisation", () => {
+    const first = workspaceIds({ userId: "user:1", organisationId: "org:one", mode: "clerk", isInternalOperator: false, displayName: "One" });
+    const second = workspaceIds({ userId: "user:2", organisationId: "org:two", mode: "clerk", isInternalOperator: false, displayName: "Two" });
+
+    expect(first.planId).not.toBe(second.planId);
+    expect(first.reviewId).not.toBe(second.reviewId);
+    expect(first.briefId).not.toBe(second.briefId);
   });
 });
