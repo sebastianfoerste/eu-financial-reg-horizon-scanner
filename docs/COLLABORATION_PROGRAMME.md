@@ -1,4 +1,4 @@
-# Legora-inspired programme
+# Review-workspace programme
 
 The research workspace persists version-bound plans, ranked authority passages, verification states, optimistic publication locks, comments, decisions, brief revisions and activity in PostgreSQL. `/api/research/workspace` is the authenticated mutation boundary.
 

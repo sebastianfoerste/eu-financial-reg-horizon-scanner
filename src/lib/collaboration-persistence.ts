@@ -1,5 +1,5 @@
 import { getPrisma } from "@/lib/prisma";
-import { buildDemoLegoraWorkspace, canExportBrief, type BriefChangeSet, type ResearchPlan } from "@/lib/legora-workspace";
+import { buildDemoCollaborationWorkspace, canExportBrief, type BriefChangeSet, type ResearchPlan } from "@/lib/collaboration-workspace";
 import { assertOrganisationAccess, type OperatorContext } from "@/lib/authz";
 
 export class ReviewConflictError extends Error {}
@@ -30,7 +30,7 @@ export async function ensurePersistedResearchWorkspace(operator: OperatorContext
     prisma.briefRevision.findUnique({ where: { id: briefId }, select: { id: true } }),
   ]);
   if (planExists && lockExists && commentExists && briefExists) return;
-  const demo = buildDemoLegoraWorkspace();
+  const demo = buildDemoCollaborationWorkspace();
   await prisma.$transaction(async (tx) => {
     await tx.researchPlan.upsert({
       where: { id: planId },
@@ -95,7 +95,7 @@ export async function loadPersistedResearchWorkspace(operator: OperatorContext) 
     prisma.publicationReviewComment.findMany({ where: { reviewItemId: reviewId }, orderBy: { createdAt: "asc" } }),
     prisma.briefRevision.findUnique({ where: { id: briefId } }),
     prisma.auditLog.findMany({
-      where: { organisationId: operator.organisationId, entityType: "LEGORA_PUBLICATION_REVIEW", entityId: reviewId },
+      where: { organisationId: operator.organisationId, entityType: "COLLABORATION_PUBLICATION_REVIEW", entityId: reviewId },
       orderBy: { createdAt: "asc" },
     }),
   ]);
@@ -258,7 +258,7 @@ export async function mutateResearchWorkspace(input: {
         actorUserId: input.operator.userId,
         organisationId: input.operator.organisationId,
         action: input.action.toUpperCase(),
-        entityType: "LEGORA_PUBLICATION_REVIEW",
+        entityType: "COLLABORATION_PUBLICATION_REVIEW",
         entityId: reviewId,
         payloadJson: { targetId: input.targetId, revision: input.expectedRevision + 1 },
       },

@@ -9,8 +9,8 @@ INSERT INTO "Source" (
   "isActive"
 )
 VALUES (
-  'source:legora-synthetic',
-  'legora-synthetic',
+  'source:collaboration-synthetic',
+  'collaboration-synthetic',
   'Synthetic research workspace source',
   'eu',
   'https://example.invalid/horizon-synthetic',
@@ -40,7 +40,7 @@ INSERT INTO "Publication" (
 )
 SELECT
   id,
-  'source:legora-synthetic',
+  'source:collaboration-synthetic',
   'https://example.invalid/horizon-synthetic/' || replace(id, ':', '-'),
   id,
   'Synthetic research workspace publication ' || id,

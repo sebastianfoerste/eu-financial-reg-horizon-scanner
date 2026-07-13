@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireOperator } from "@/lib/authz";
-import { loadApprovedBriefExport } from "@/lib/legora-persistence";
+import { loadApprovedBriefExport } from "@/lib/collaboration-persistence";
 
 export async function GET(request: Request) {
   try {

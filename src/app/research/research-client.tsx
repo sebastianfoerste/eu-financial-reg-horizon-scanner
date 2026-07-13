@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-type Workspace = Awaited<ReturnType<typeof import("@/lib/legora-persistence").loadPersistedResearchWorkspace>>;
+type Workspace = Awaited<ReturnType<typeof import("@/lib/collaboration-persistence").loadPersistedResearchWorkspace>>;
 
 export function ResearchClient({ initial }: { initial: Workspace }) {
   const [workspace, setWorkspace] = useState(initial);
