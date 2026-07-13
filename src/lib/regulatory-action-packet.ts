@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 
+import { stableStringify } from "@/lib/canonical-json";
 import type { ReviewQueueView } from "@/lib/review";
 import { summarizeReviewReadiness } from "@/lib/review-readiness";
 import type { SourceDiligenceView } from "@/lib/source-diligence";
@@ -188,18 +189,4 @@ function capOptionalText(value: string | null | undefined, limit: number) {
 
 function capText(value: string, limit: number) {
   return value.length <= limit ? value : `${value.slice(0, limit - 3).trim()}...`;
-}
-
-function stableStringify(value: unknown): string {
-  if (Array.isArray(value)) {
-    return `[${value.map((item) => stableStringify(item)).join(",")}]`;
-  }
-  if (value && typeof value === "object") {
-    const record = value as Record<string, unknown>;
-    return `{${Object.keys(record)
-      .sort()
-      .map((key) => `${JSON.stringify(key)}:${stableStringify(record[key])}`)
-      .join(",")}}`;
-  }
-  return JSON.stringify(value);
 }

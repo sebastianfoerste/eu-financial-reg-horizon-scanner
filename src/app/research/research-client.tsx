@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-type Workspace = Awaited<ReturnType<typeof import("@/lib/legora-persistence").loadPersistedResearchWorkspace>>;
+type Workspace = Awaited<ReturnType<typeof import("@/lib/collaboration-persistence").loadPersistedResearchWorkspace>>;
 
 export function ResearchClient({ initial }: { initial: Workspace }) {
   const [workspace, setWorkspace] = useState(initial);
@@ -14,7 +14,9 @@ export function ResearchClient({ initial }: { initial: Workspace }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ expectedRevision: workspace.collaboration.revision, ...payload }),
     });
-    const result = await response.json();
+    const result = await response.json().catch(() => ({
+      error: `Research mutation failed with HTTP ${response.status}`,
+    }));
     if (!response.ok) {
       setError(result.error ?? "Research mutation failed");
       return;

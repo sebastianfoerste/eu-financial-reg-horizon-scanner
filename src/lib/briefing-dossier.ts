@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 
+import { stableStringify } from "@/lib/canonical-json";
 import type { buildPilotBriefing } from "@/lib/pilot-briefing";
 
 type Briefing = ReturnType<typeof buildPilotBriefing>;
@@ -121,18 +122,4 @@ export function buildBriefingDossier(input: {
       raw_publication_text_included: false,
     },
   };
-}
-
-function stableStringify(value: unknown): string {
-  if (Array.isArray(value)) {
-    return `[${value.map((item) => stableStringify(item)).join(",")}]`;
-  }
-  if (value && typeof value === "object") {
-    const record = value as Record<string, unknown>;
-    return `{${Object.keys(record)
-      .sort()
-      .map((key) => `${JSON.stringify(key)}:${stableStringify(record[key])}`)
-      .join(",")}}`;
-  }
-  return JSON.stringify(value);
 }

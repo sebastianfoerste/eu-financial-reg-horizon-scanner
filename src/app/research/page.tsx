@@ -1,18 +1,18 @@
 import { AppShell } from "@/components/app-shell";
 import { buildDemoResearchWorkspace } from "@/lib/regulatory-research-workspace";
-import { buildDemoLegoraWorkspace } from "@/lib/legora-workspace";
+import { buildDemoCollaborationWorkspace } from "@/lib/collaboration-workspace";
 import { hasDatabaseUrl } from "@/lib/env";
-import { loadPersistedResearchWorkspace } from "@/lib/legora-persistence";
+import { loadPersistedResearchWorkspace } from "@/lib/collaboration-persistence";
 import { requireOperator } from "@/lib/authz";
 
 import { ResearchClient } from "./research-client";
 
 export default async function ResearchWorkspacePage() {
   const { knowledgeBase, answer, sharedSpace } = buildDemoResearchWorkspace();
-  const persistedLegora = hasDatabaseUrl()
+  const persistedCollaboration = hasDatabaseUrl()
     ? await loadPersistedResearchWorkspace(await requireOperator())
     : null;
-  const legora = persistedLegora ?? buildDemoLegoraWorkspace();
+  const collaboration = persistedCollaboration ?? buildDemoCollaborationWorkspace();
   return (
     <AppShell active="/research">
       <div className="space-y-6">
@@ -57,13 +57,13 @@ export default async function ResearchWorkspacePage() {
             ))}
           </div>
         </section>
-        {persistedLegora && <ResearchClient initial={persistedLegora} />}
+        {persistedCollaboration && <ResearchClient initial={persistedCollaboration} />}
 
         <section className="grid gap-3 md:grid-cols-3">
           {[
-            ["Research plan", `${legora.researchPlan.jurisdictions.length} jurisdictions`, `${legora.researchPlan.passages.length} ranked source passages`],
-            ["Publication review", `${legora.collaboration.comments.length} open thread`, `Revision ${legora.collaboration.revision} with optimistic locking`],
-            ["Evidence editor", `${legora.editor.changes.length} proposed change`, `DOCX and Markdown export remain review-gated`],
+            ["Research plan", `${collaboration.researchPlan.jurisdictions.length} jurisdictions`, `${collaboration.researchPlan.passages.length} ranked source passages`],
+            ["Publication review", `${collaboration.collaboration.comments.length} open thread`, `Revision ${collaboration.collaboration.revision} with optimistic locking`],
+            ["Evidence editor", `${collaboration.editor.changes.length} proposed change`, `DOCX and Markdown export remain review-gated`],
           ].map(([label, value, detail]) => <article key={label} className="rounded-lg border border-zinc-200 bg-white p-4"><p className="text-xs uppercase text-zinc-500">{label}</p><strong className="mt-1 block">{value}</strong><p className="mt-1 text-xs text-zinc-500">{detail}</p></article>)}
         </section>
 

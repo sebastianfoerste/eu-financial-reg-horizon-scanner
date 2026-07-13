@@ -5,7 +5,7 @@ import {
   loadPersistedResearchWorkspace,
   mutateResearchWorkspace,
   ReviewConflictError,
-} from "@/lib/legora-persistence";
+} from "@/lib/collaboration-persistence";
 
 export async function GET() {
   return NextResponse.json(await loadPersistedResearchWorkspace(await requireOperator()));

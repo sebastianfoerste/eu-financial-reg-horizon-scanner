@@ -39,7 +39,13 @@ const AUTHORITY_ORDER: AuthorityTier[] = ["eu_legislation", "delegated_act", "eu
 export function buildResearchPlan(input: Omit<ResearchPlan, "schema" | "unresolvedQuestions">): ResearchPlan {
   if (!input.taxonomyVersion || !input.publicationVersionId) throw new Error("Research plans require taxonomy and publication versions.");
   const passages = [...input.passages].sort((a, b) => AUTHORITY_ORDER.indexOf(a.authorityTier) - AUTHORITY_ORDER.indexOf(b.authorityTier));
-  const unresolvedQuestions = input.questions.filter((question) => !passages.some((passage) => passage.verification === "verified" && question.toLowerCase().split(/\W+/).filter((term) => term.length > 4).some((term) => passage.text.toLowerCase().includes(term))));
+  const unresolvedQuestions = input.questions.filter((question) => {
+    const terms = question.normalize("NFKC").toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) ?? [];
+    return !passages.some((passage) => {
+      const text = passage.text.normalize("NFKC").toLowerCase();
+      return passage.verification === "verified" && terms.some((term) => text.includes(term));
+    });
+  });
   return { ...input, schema: "research.plan.v1", passages, unresolvedQuestions };
 }
 
@@ -59,7 +65,7 @@ export function canExportBrief(changeSet: BriefChangeSet) {
   return changeSet.evidenceGatePassed && changeSet.reviewerApproved && changeSet.changes.every((change) => change.decision !== "pending");
 }
 
-export function buildDemoLegoraWorkspace() {
+export function buildDemoCollaborationWorkspace() {
   const researchPlan = buildResearchPlan({ id: "research:synthetic-micar-update", organisationId: null, publicationId: "publication:synthetic", publicationVersionId: "version:1", taxonomyVersion: "2026.07.13", jurisdictions: ["EU", "DE"], questions: ["What changes the authorisation timetable?"], passages: [{ id: "passage:1", authorityTier: "eu_legislation", text: "The authorisation timetable begins when the application is complete.", sourceRef: "fixture://eur-lex/micar/authorisation", retrievalOrigin: "fixture", verification: "verified" }, { id: "passage:2", authorityTier: "national_authority", text: "The national authority contact route requires current verification.", sourceRef: "fixture://bafin/micar", retrievalOrigin: "fixture", verification: "review_required" }] });
   const collaboration: PublicationCollaboration = { schema: "review.collaboration.v1", reviewItemId: "review:synthetic", revision: 1, reviewer: null, lock: null, comments: [{ id: "comment:1", targetId: "paragraph:0", body: "Verify the exact timetable against the official text.", actor: "Regulatory reviewer", status: "open" }], activity: [] };
   const editor: BriefChangeSet = { schema: "document.change-set.v1", publicationId: researchPlan.publicationId, sourceVersionId: researchPlan.publicationVersionId, changes: [{ id: "change:1", paragraphIndex: 0, originalText: "The timetable starts immediately.", proposedText: "The timetable begins when the application is complete.", evidenceRefs: [researchPlan.passages[0].sourceRef], decision: "pending" }], evidenceGatePassed: true, reviewerApproved: false, exportFormats: ["markdown", "docx"], externalDeliveryAllowed: false };

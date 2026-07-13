@@ -65,7 +65,7 @@ export function buildRegulatoryKnowledgeBase(
     if (!source.sourceUrl.startsWith("https://")) throw new Error(`Source ${source.id} requires an HTTPS provenance URL.`);
     ids.add(source.id);
     for (const topic of source.topics) {
-      topicIndex[topic] = [...(topicIndex[topic] ?? []), source.id];
+      (topicIndex[topic] ??= []).push(source.id);
     }
   }
   return {
