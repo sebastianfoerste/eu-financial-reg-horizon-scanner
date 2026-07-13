@@ -12,6 +12,7 @@ import {
   PlugZap,
   Radar,
   ScrollText,
+  SearchCheck,
 } from "lucide-react";
 
 import { AuthControls } from "@/components/auth-controls";
@@ -20,6 +21,7 @@ import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/briefing", label: "Briefing", icon: Gauge },
+  { href: "/research", label: "Research", icon: SearchCheck },
   { href: "/", label: "Publications", icon: FileText },
   { href: "/law-firm", label: "Law firm", icon: BriefcaseBusiness },
   { href: "/agents", label: "Agents", icon: Bot },

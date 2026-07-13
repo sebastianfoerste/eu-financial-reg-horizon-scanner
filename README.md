@@ -21,6 +21,7 @@ npm run build
 - Human reviewer queue.
 - Approved alert draft workflow.
 - Monitor review table: turns public regulator publications into review rows with source status, affected products, owner, proof-packet status, delivery blockers and next action.
+- Research workspace (`/research`): source-status knowledge base, cited impact research assistant and a role-scoped shared impact space. Product maps remain local and external delivery remains disabled.
 
 ## Demo coverage
 
