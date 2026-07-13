@@ -7,9 +7,7 @@ export async function GET(request: Request) {
   try {
     const format = new URL(request.url).searchParams.get("format") === "docx" ? "docx" : "markdown";
     const result = await loadApprovedBriefExport(await requireOperator(), format);
-    const body = typeof result.body === "string"
-      ? result.body
-      : new Uint8Array(result.body).buffer;
+    const body = typeof result.body === "string" ? result.body : Buffer.from(result.body);
     return new Response(body, {
       headers: {
         "Content-Type": result.contentType,

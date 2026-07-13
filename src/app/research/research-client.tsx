@@ -14,7 +14,9 @@ export function ResearchClient({ initial }: { initial: Workspace }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ expectedRevision: workspace.collaboration.revision, ...payload }),
     });
-    const result = await response.json();
+    const result = await response.json().catch(() => ({
+      error: `Research mutation failed with HTTP ${response.status}`,
+    }));
     if (!response.ok) {
       setError(result.error ?? "Research mutation failed");
       return;

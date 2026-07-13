@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDemoLegoraWorkspace, canExportBrief, decideBriefChange, lockPublicationReview } from "@/lib/legora-workspace";
+import { buildDemoLegoraWorkspace, buildResearchPlan, canExportBrief, decideBriefChange, lockPublicationReview } from "@/lib/legora-workspace";
 import { workspaceIds } from "@/lib/legora-persistence";
 
 describe("research, collaboration and evidence editor", () => {
@@ -7,6 +7,27 @@ describe("research, collaboration and evidence editor", () => {
     const { researchPlan } = buildDemoLegoraWorkspace();
     expect(researchPlan.taxonomyVersion).toBeTruthy();
     expect(researchPlan.passages[0].authorityTier).toBe("eu_legislation");
+  });
+
+  it("resolves questions using short regulatory terms and Unicode text", () => {
+    const plan = buildResearchPlan({
+      id: "research:unicode",
+      organisationId: null,
+      publicationId: "publication:unicode",
+      publicationVersionId: "version:unicode",
+      taxonomyVersion: "2026.07.13",
+      jurisdictions: ["EU"],
+      questions: ["Does DORA govern résilience testing?"],
+      passages: [{
+        id: "passage:unicode",
+        authorityTier: "eu_legislation",
+        text: "DORA includes résilience testing obligations.",
+        sourceRef: "fixture://dora",
+        retrievalOrigin: "fixture",
+        verification: "verified",
+      }],
+    });
+    expect(plan.unresolvedQuestions).toEqual([]);
   });
 
   it("rejects stale review locks", () => {

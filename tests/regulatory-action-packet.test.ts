@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { stableStringify } from "@/lib/canonical-json";
 import { buildRegulatoryActionPacket } from "@/lib/regulatory-action-packet";
 import type { ReviewQueueView } from "@/lib/review";
 import type { SourceDiligenceView } from "@/lib/source-diligence";
@@ -78,6 +79,27 @@ const sourceDiligence: SourceDiligenceView = {
 };
 
 describe("regulatory action packet", () => {
+  it("canonicalizes JSON-compatible values and rejects cycles", () => {
+    const first = stableStringify({
+      z: undefined,
+      b: [undefined, { y: 2, a: 1 }],
+      a: new Date("2026-07-13T00:00:00Z"),
+      custom: { toJSON: () => ({ second: 2, first: 1 }) },
+    });
+    const second = stableStringify({
+      custom: { toJSON: () => ({ first: 1, second: 2 }) },
+      a: new Date("2026-07-13T00:00:00Z"),
+      b: [undefined, { a: 1, y: 2 }],
+      z: undefined,
+    });
+    expect(first).toBe(second);
+    expect(first).not.toContain('"z"');
+    expect(first).toContain("[null,");
+    const cycle: Record<string, unknown> = {};
+    cycle.self = cycle;
+    expect(() => stableStringify(cycle)).toThrow("cyclic");
+  });
+
   it("builds approved metadata packets without raw body text", () => {
     const packet = buildRegulatoryActionPacket({
       reviewItem,

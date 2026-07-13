@@ -39,7 +39,13 @@ const AUTHORITY_ORDER: AuthorityTier[] = ["eu_legislation", "delegated_act", "eu
 export function buildResearchPlan(input: Omit<ResearchPlan, "schema" | "unresolvedQuestions">): ResearchPlan {
   if (!input.taxonomyVersion || !input.publicationVersionId) throw new Error("Research plans require taxonomy and publication versions.");
   const passages = [...input.passages].sort((a, b) => AUTHORITY_ORDER.indexOf(a.authorityTier) - AUTHORITY_ORDER.indexOf(b.authorityTier));
-  const unresolvedQuestions = input.questions.filter((question) => !passages.some((passage) => passage.verification === "verified" && question.toLowerCase().split(/\W+/).filter((term) => term.length > 4).some((term) => passage.text.toLowerCase().includes(term))));
+  const unresolvedQuestions = input.questions.filter((question) => {
+    const terms = question.normalize("NFKC").toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) ?? [];
+    return !passages.some((passage) => {
+      const text = passage.text.normalize("NFKC").toLowerCase();
+      return passage.verification === "verified" && terms.some((term) => text.includes(term));
+    });
+  });
   return { ...input, schema: "research.plan.v1", passages, unresolvedQuestions };
 }
 

@@ -33,5 +33,12 @@ export async function GET() {
     productMaps,
   });
 
-  return NextResponse.json(buildBriefingDossier({ briefing, sourceFreshness, productMapReadiness }));
+  return NextResponse.json(
+    buildBriefingDossier({ briefing, sourceFreshness, productMapReadiness }),
+    {
+      headers: {
+        "Content-Disposition": "attachment; filename=regulatory-briefing-dossier.json",
+      },
+    },
+  );
 }

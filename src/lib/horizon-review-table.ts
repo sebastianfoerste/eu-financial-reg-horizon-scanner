@@ -321,7 +321,7 @@ function buildBlockers(input: {
 
 function nextAction(row: Pick<HorizonReviewTableRow, "blockers" | "proofPacketStatus" | "alertStatus">) {
   if (row.blockers.length > 0) return row.blockers[0];
-  if (row.proofPacketStatus === "missing") return "Generate a proof packet before delivery approval.";
+  if (row.proofPacketStatus === "missing") return "Generate an evidence packet before delivery approval.";
   if (row.alertStatus === "DRAFT") return "Approve the draft alert after reviewer sign-off.";
   return "Ready for reviewed delivery or archive after supervisory review.";
 }
@@ -395,7 +395,7 @@ function buildPinpointCitations({
     citations.push({
       sourceId: proofPacket.id,
       sourceClass: "proof_packet",
-      citationLabel: `Proof packet ${proofPacket.gateStatus}`,
+      citationLabel: `Evidence packet ${proofPacket.gateStatus}`,
       url: alert?.payload.publicationUrl ?? null,
       rawHash: proofPacket.payloadDigest,
       quote: proofPacket.reasons.join("; ") || proofPacket.gateStatus,
@@ -459,7 +459,7 @@ function buildReviewCells(row: HorizonReviewTableRow): HorizonReviewTableCell[] 
     affected_products: "Affected products",
     assigned_reviewer: "Assigned reviewer",
     review_status: "Review status",
-    proof_packet_status: "Proof packet status",
+    proof_packet_status: "Evidence packet status",
     citation_coverage: "Citation coverage",
     alert_status: "Alert status",
     delivery_status: "Delivery status",
@@ -626,7 +626,7 @@ function buildPromptBrief({
   const highestPriority = rows[0];
   const blockedReasons = unique(rows.flatMap((row) => row.blockers)).slice(0, 4);
   const failureConditions = [
-    "Do not state that an alert is send-ready unless review approval and proof packet gates pass.",
+    "Do not state that an alert is send-ready unless review approval and evidence packet gates pass.",
     "Do not infer product impact when the product map is stale or unconfirmed.",
     "Do not omit source freshness, source URL, raw hash status or reviewer state.",
   ];
@@ -643,13 +643,13 @@ function buildPromptBrief({
       "Source diligence and freshness record",
       "Confirmed product map",
       "Human review decision",
-      "Alert proof packet",
+      "Alert evidence packet",
     ],
     requiredInputs: [
       "publication title, source, source URL and raw hash status",
       "affected product map entries and service offerings",
       "reviewer name, review status and decision reason",
-      "proof packet status, citation coverage and blockers",
+      "evidence packet status, citation coverage and blockers",
     ],
     outputFormat: [
       "one-line alert subject",
@@ -659,12 +659,12 @@ function buildPromptBrief({
       "review gate and next action",
     ],
     reviewGate:
-      "Draft-only. A named reviewer must approve the publication row and proof packet before any delivery action.",
+      "Draft-only. A named reviewer must approve the publication row and evidence packet before any delivery action.",
     failureConditions: blockedReasons.length ? unique([...failureConditions, ...blockedReasons]) : failureConditions,
     suggestedPrompt: [
       "Role: EU financial-regulation monitoring lawyer.",
       `Objective: draft a review-gated alert preview for ${highestPriority?.title ?? "the selected publication"}.`,
-      "Use the regulator publication, source diligence, confirmed product map and proof packet as the source hierarchy.",
+      "Use the regulator publication, source diligence, confirmed product map and evidence packet as the source hierarchy.",
       `Current queue: ${summary.totalRows} row(s), ${summary.blockedRows} blocked, ${summary.readyRows} ready.`,
       "Output: subject, legal-impact summary, affected products, source status, proof status, blockers and next action.",
       "Review gate: draft only. Do not send, schedule or approve external delivery.",
@@ -691,7 +691,7 @@ function buildControlProfile({
     schema: "horizon-scanner.alert-review-control.v1",
     externalActionAllowed: false,
     routeSummary: `${summary.readyRows} ready row(s), ${summary.blockedRows} blocked row(s), external delivery blocked until reviewed approval.`,
-    contextWindowStrategy: `${rows.length} alert row(s) evaluated one publication and proof packet at a time.`,
+    contextWindowStrategy: `${rows.length} alert row(s) evaluated one publication and evidence packet at a time.`,
     workflowRoutes: [
       {
         key: "source-ingestion",
@@ -709,10 +709,10 @@ function buildControlProfile({
       },
       {
         key: "proof-packet-builder",
-        label: "Proof packet builder",
+        label: "Evidence packet builder",
         status: allProofReady ? "ready" : "review_required",
         route: "deterministic_local",
-        gate: "Proof packet must include source authority, reviewer state and digest.",
+        gate: "Evidence packet must include source authority, reviewer state and digest.",
       },
       {
         key: "agent-preview",
@@ -852,7 +852,7 @@ function buildMonitorProfile({
         key: "legal_capabilities",
         label: "Legal capabilities",
         status: "implemented",
-        evidence: "Publication review, product impact and proof packet gates are linked.",
+        evidence: "Publication review, product impact and evidence packet gates are linked.",
         gate: "Alert previews are workflow inputs, not legal assessments.",
       },
       {
@@ -873,7 +873,7 @@ function buildMonitorProfile({
     agentPlan: {
       plan: "Select source perimeter, jurisdiction, topic tags, products and reviewer.",
       execute: "Generate deterministic review rows and draft-only alert previews.",
-      review: "Check source freshness, citation coverage, proof packet and reviewer approval.",
+      review: "Check source freshness, citation coverage, evidence packet and reviewer approval.",
       deliver: "Prepare reviewed local export metadata while external delivery remains blocked.",
     },
     skills: [
@@ -887,10 +887,10 @@ function buildMonitorProfile({
       },
       {
         id: "proof-packet-check",
-        label: "Proof packet check",
+        label: "Evidence packet check",
         objective: "Check source authority, reviewer state and alert payload digest.",
-        outputSchema: ["proof packet status", "citation coverage", "blockers", "next action"],
-        reviewGate: "Proof packet must pass before delivery approval.",
+        outputSchema: ["evidence packet status", "citation coverage", "blockers", "next action"],
+        reviewGate: "Evidence packet must pass before delivery approval.",
         externalActionAllowed: false,
       },
       {
@@ -952,7 +952,7 @@ function buildMonitorProfile({
         })),
         {
           key: "delivery-preflight",
-          label: "Confirm proof packet before alert delivery",
+          label: "Confirm evidence packet before alert delivery",
           owner: "Responsible reviewer",
           signOffRequired: true,
         },

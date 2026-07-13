@@ -15,8 +15,22 @@ export function workspaceIds(operator: OperatorContext) {
 
 export async function ensurePersistedResearchWorkspace(operator: OperatorContext) {
   const prisma = getPrisma();
-  const demo = buildDemoLegoraWorkspace();
   const { reviewId, planId, briefId } = workspaceIds(operator);
+  const commentId = `comment:${operator.organisationId ?? "local-demo"}:synthetic-timetable`;
+  const [planExists, lockExists, commentExists, briefExists] = await Promise.all([
+    prisma.researchPlan.findUnique({ where: { id: planId }, select: { id: true } }),
+    prisma.publicationReviewLock.findUnique({
+      where: { reviewItemId: reviewId },
+      select: { id: true },
+    }),
+    prisma.publicationReviewComment.findUnique({
+      where: { id: commentId },
+      select: { id: true },
+    }),
+    prisma.briefRevision.findUnique({ where: { id: briefId }, select: { id: true } }),
+  ]);
+  if (planExists && lockExists && commentExists && briefExists) return;
+  const demo = buildDemoLegoraWorkspace();
   await prisma.$transaction(async (tx) => {
     await tx.researchPlan.upsert({
       where: { id: planId },
@@ -45,9 +59,9 @@ export async function ensurePersistedResearchWorkspace(operator: OperatorContext
       update: {},
     });
     await tx.publicationReviewComment.upsert({
-      where: { id: `comment:${operator.organisationId ?? "local-demo"}:synthetic-timetable` },
+      where: { id: commentId },
       create: {
-        id: `comment:${operator.organisationId ?? "local-demo"}:synthetic-timetable`,
+        id: commentId,
         reviewItemId: reviewId,
         targetId: "paragraph:0",
         body: demo.collaboration.comments[0].body,
@@ -143,6 +157,29 @@ export async function mutateResearchWorkspace(input: {
   value?: string;
   targetId?: string;
 }) {
+  const allowedActions = new Set([
+    "lock",
+    "comment",
+    "resolve_comment",
+    "decide_change",
+    "approve_brief",
+    "verify_passage",
+  ]);
+  if (!allowedActions.has(input.action)) throw new Error("Unsupported research workspace action.");
+  if (input.action === "comment" && !input.value?.trim()) throw new Error("Comment body is required.");
+  if (
+    ["resolve_comment", "decide_change", "verify_passage"].includes(input.action) &&
+    !input.targetId
+  ) {
+    throw new Error("Research workspace action requires a target.");
+  }
+  if (
+    input.action === "decide_change" &&
+    input.value !== "accepted" &&
+    input.value !== "rejected"
+  ) {
+    throw new Error("Brief change decision must be accepted or rejected.");
+  }
   const prisma = getPrisma();
   await ensurePersistedResearchWorkspace(input.operator);
   const { reviewId, planId, briefId } = workspaceIds(input.operator);
@@ -166,12 +203,11 @@ export async function mutateResearchWorkspace(input: {
     });
     if (updated.count !== 1) throw new ReviewConflictError("409 Conflict: stale publication review revision");
     if (input.action === "comment") {
-      if (!input.value?.trim()) throw new Error("Comment body is required.");
       await tx.publicationReviewComment.create({
         data: {
           reviewItemId: reviewId,
           targetId: input.targetId ?? "brief:0",
-          body: input.value.trim(),
+          body: input.value!.trim(),
           actorId: input.operator.userId,
           actorName: input.operator.displayName ?? "Demo reviewer",
         },
@@ -188,7 +224,7 @@ export async function mutateResearchWorkspace(input: {
       const brief = await tx.briefRevision.findUniqueOrThrow({ where: { id: briefId } });
       const changes = brief.changesJson as unknown as BriefChangeSet["changes"];
       const next = changes.map((change) => change.id === input.targetId
-        ? { ...change, decision: input.value === "accepted" ? "accepted" as const : "rejected" as const }
+        ? { ...change, decision: input.value! as "accepted" | "rejected" }
         : change);
       if (next.every((change) => change.id !== input.targetId)) throw new Error("Brief change not found.");
       await tx.briefRevision.update({ where: { id: briefId }, data: { changesJson: next } });
@@ -239,8 +275,21 @@ export async function loadApprovedBriefExport(operator: OperatorContext, format:
   if (format === "markdown") return { body: markdown, contentType: "text/markdown; charset=utf-8" };
   const { default: JSZip } = await import("jszip");
   const zip = new JSZip();
-  const xml = markdown.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+  const escapeXml = (value: string) => value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+  const paragraphs = markdown
+    .split(/\n{2,}/)
+    .map((paragraph) => {
+      const runs = paragraph
+        .split("\n")
+        .map((line, index) => `${index ? "<w:r><w:br/></w:r>" : ""}<w:r><w:t xml:space='preserve'>${escapeXml(line)}</w:t></w:r>`)
+        .join("");
+      return `<w:p>${runs}</w:p>`;
+    })
+    .join("");
   zip.file("[Content_Types].xml", "<Types xmlns='http://schemas.openxmlformats.org/package/2006/content-types'><Default Extension='xml' ContentType='application/xml'/><Override PartName='/word/document.xml' ContentType='application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'/></Types>");
-  zip.file("word/document.xml", `<?xml version='1.0'?><w:document xmlns:w='http://schemas.openxmlformats.org/wordprocessingml/2006/main'><w:body><w:p><w:r><w:t>${xml}</w:t></w:r></w:p><w:sectPr/></w:body></w:document>`);
+  zip.file("word/document.xml", `<?xml version='1.0'?><w:document xmlns:w='http://schemas.openxmlformats.org/wordprocessingml/2006/main'><w:body>${paragraphs}<w:sectPr/></w:body></w:document>`);
   return { body: await zip.generateAsync({ type: "uint8array" }), contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" };
 }
