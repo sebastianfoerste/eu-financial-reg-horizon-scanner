@@ -1,10 +1,18 @@
 import { AppShell } from "@/components/app-shell";
 import { buildDemoResearchWorkspace } from "@/lib/regulatory-research-workspace";
 import { buildDemoLegoraWorkspace } from "@/lib/legora-workspace";
+import { hasDatabaseUrl } from "@/lib/env";
+import { loadPersistedResearchWorkspace } from "@/lib/legora-persistence";
+import { requireOperator } from "@/lib/authz";
 
-export default function ResearchWorkspacePage() {
+import { ResearchClient } from "./research-client";
+
+export default async function ResearchWorkspacePage() {
   const { knowledgeBase, answer, sharedSpace } = buildDemoResearchWorkspace();
-  const legora = buildDemoLegoraWorkspace();
+  const persistedLegora = hasDatabaseUrl()
+    ? await loadPersistedResearchWorkspace(await requireOperator())
+    : null;
+  const legora = persistedLegora ?? buildDemoLegoraWorkspace();
   return (
     <AppShell active="/research">
       <div className="space-y-6">
@@ -49,6 +57,7 @@ export default function ResearchWorkspacePage() {
             ))}
           </div>
         </section>
+        {persistedLegora && <ResearchClient initial={persistedLegora} />}
 
         <section className="grid gap-3 md:grid-cols-3">
           {[
