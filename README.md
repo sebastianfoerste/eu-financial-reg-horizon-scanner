@@ -39,3 +39,13 @@ Next.js, React, TypeScript, Prisma, PostgreSQL, pgvector and Vitest.
 ## Safety
 
 This is a public-safe prototype using synthetic demo data. It does not provide legal advice, binding regulatory interpretation or filing guidance. Human review is required before reliance.
+
+## Related
+
+Part of a portfolio of deterministic, review-gated EU-regulation tools:
+
+- [micar-whitepaper-linter](https://github.com/sebastianfoerste/micar-whitepaper-linter) — MiCAR whitepaper linter with pinpoint citations and a CI action.
+- [eu-ai-act-classifier](https://github.com/sebastianfoerste/eu-ai-act-classifier) — EU AI Act risk-tier classifier with cited obligations.
+- [dora-third-party-register-and-resilience-workbench](https://github.com/sebastianfoerste/dora-third-party-register-and-resilience-workbench) — DORA ICT third-party register and resilience workbench.
+
+Curated index of EU financial-regulation primary sources and tools: [awesome-eu-fintech-regulation](https://github.com/sebastianfoerste/awesome-eu-fintech-regulation).
